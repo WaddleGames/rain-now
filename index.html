@@ -281,7 +281,7 @@
     <span id="sync-indicator">● UPDATING</span>
 
     <h1>
-        <span>SkyMonitor <span style="font-size:0.4em; color:#888; font-weight:normal;">v1.0.4</span></span>
+        <span>SkyMonitor <span style="font-size:0.4em; color:#888; font-weight:normal;">v1.0.3</span></span>
     </h1>
     
     <div style="display: flex; align-items: flex-start; gap: 10px;">
@@ -586,7 +586,7 @@
     <div style="margin-bottom: 8px;">
         <span style="letter-spacing: 2px; font-weight: 800; color: #aaa;">SkyMonitor</span> 
         <span style="margin: 0 8px; opacity: 0.3;">|</span>
-        ALPHA RELEASE - v1.0.4
+        ALPHA RELEASE - v1.0.3
     </div>
     <p style="margin: 0;">
         Created by <a href="https://youtube.com/@chicagoareaEAS" target="_blank" style="color: var(--accent); text-decoration: none; font-weight: bold;">@chicagoareaEAS</a> on YouTube
@@ -620,7 +620,7 @@
     let lastStormCall = JSON.parse(localStorage.getItem('waddle_storm_mem')) || { time: null, dist: null, speed: null, motion: "STATIONARY", isApproaching: false, etaText: "N/A" };
     let activeSPCDay = 1;
     
-    // v1.0.4 globals
+    // v1.0.3 globals
     window.currentStormDist = null;
     window.spcRisk = null;
     window.lightningRisk = 'NONE';
@@ -1183,7 +1183,7 @@
             updateSmartComfort(uiTemp, liveFeelsLike, uiHum, liveWindSpd, condition, liveUV);
         }
         
-        // v1.0.4: compute threat level after all data loads
+        // v1.0.3: compute threat level after all data loads
         computeThreatLevel();
         // Update lightning estimator if severe tab is active
         if (document.getElementById('severe-tab').classList.contains('active')) {
@@ -1695,7 +1695,7 @@
                 });
             }
 
-            // v1.0.4: store storm distance globally for threat level + lightning estimator
+            // v1.0.3: store storm distance globally for threat level + lightning estimator
             const currentDist = d.currently?.nearestStormDistance;
             const currentBearing = d.currently?.nearestStormBearing;
             window.currentStormDist = currentDist;
@@ -1916,7 +1916,7 @@
         document.getElementById('dashboard').style.backdropFilter = "blur(20px)";
     }
 
-    // v1.0.4: Rain speed +50%, count +10%
+    // v1.0.3: Rain speed +50%, count +10%
     function startWeatherFX(condition) {
         stopWeatherFX();
         const canvas = document.getElementById('rainCanvas');
@@ -1950,7 +1950,7 @@
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
                 len: type === 'fog' ? Math.random() * 80 + 40 : (type === 'rain' ? (Math.random() * 11 + 6) * speedMult : Math.random() * 4 + 2),
-                // v1.0.4: rain +50% faster, snow +50% faster
+                // v1.0.3: rain +50% faster, snow +50% faster
                 vel: type === 'fog' ? Math.random() * 0.5 + 0.1 :
                      (type === 'rain' ? (Math.random() * 7.5 + 4.5) * speedMult :
                       Math.random() * 1.5 + 0.75),
@@ -2001,7 +2001,7 @@
     }
 
     // =============================================
-    // v1.0.4: ENHANCED DYNAMIC SKY RENDERING
+    // v1.0.3: ENHANCED DYNAMIC SKY RENDERING
     // =============================================
     function initSkyStars() {
         skyStars = [];
@@ -2122,7 +2122,7 @@
     }
 
     // =============================================
-    // v1.0.4: STORM-BASED LIGHTNING ESTIMATOR
+    // v1.0.3: STORM-BASED LIGHTNING ESTIMATOR
     // (Replaces Blitzortung paid WebSocket API)
     // =============================================
     function haversineMi(la1, lo1, la2, lo2) {
@@ -2237,7 +2237,7 @@
     }, 30000);
 
     // =============================================
-    // v1.0.4: THREAT LEVEL SYSTEM
+    // v1.0.3: THREAT LEVEL SYSTEM
     // =============================================
     function computeThreatLevel() {
         const box = document.getElementById('threat-level-box');
@@ -2414,7 +2414,7 @@
     }
 
     // =============================================
-    // v1.0.4: ADVANCED ANALYTICS — INTERACTIVE CHARTS (Chart.js)
+    // v1.0.3: ADVANCED ANALYTICS — INTERACTIVE CHARTS (Chart.js)
     // =============================================
     function renderAnalytics() {
         if (!window.pirateHourlyData || !window.pirateHourlyData.length) return;
@@ -2730,7 +2730,7 @@
     }
 
     // =============================================
-    // v1.0.4: MOBILE — SWIPE TABS + PULL-TO-REFRESH
+    // v1.0.3: MOBILE — SWIPE TABS + PULL-TO-REFRESH
     // =============================================
     const tabs = ['home', 'severe', 'specs'];
     const navIds = ['nav-home', 'nav-severe', 'nav-specs'];
@@ -2808,12 +2808,12 @@
     };
 
     // =============================================
-    // v1.0.4: PWA SERVICE WORKER
+    // v1.0.3: PWA SERVICE WORKER
     // =============================================
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             const swCode = `
-const CACHE = 'skymonitor-v1.0.4';
+const CACHE = 'skymonitor-v1.0.3';
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); });
 self.addEventListener('fetch', e => {
