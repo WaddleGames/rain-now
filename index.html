@@ -498,10 +498,18 @@
         <div class="toolkit-box">
             <div class="toolkit-header" style="margin-bottom:10px;">
                 <span>&#128506; LIVE REPORTING MAP</span>
-                <button onclick="loadReportingMapData()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#8635; REFRESH</button>
+                <div style="display:flex; gap:6px;">
+                    <button onclick="loadReportingMapData()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#8635; REFRESH</button>
+                    <button id="radar-toggle-btn" onclick="toggleReportingRadar()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#128225; Radar ON</button>
+                </div>
             </div>
 
             <div id="reporting-map"></div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; margin-bottom:4px;">
+                <div style="font-size:0.72em; color:#aaa;">&#128204; Click map to pin report location</div>
+                <button onclick="findMeReporting()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.72em; cursor:pointer;">&#128205; Find Me</button>
+            </div>
+            <div id="report-pin-coords" style="font-size:0.7em; color:#4fc3f7; text-align:center; margin-bottom:8px; min-height:1em;"></div>
 
             <div style="display:flex; gap:14px; flex-wrap:wrap; font-size:0.75em; margin-bottom:15px; color:#aaa;">
                 <span><span class="report-legend-dot" style="background:#ff9100;"></span>NWS Short-Fused Alert</span>
@@ -2111,11 +2119,79 @@
     let lsrLayer = null;
     let alertPolygonLayer = null;
     let userReportLayer = null;
+    let reportingRadarLayer = null;
+    let radarVisible = true;
+    let reportLat = null, reportLon = null;
+    let reportPinMarker = null;
+
+    function updatePinCoordsDisplay() {
+        const el = document.getElementById('report-pin-coords');
+        if (!el) return;
+        if (reportLat != null && reportLon != null) {
+            el.textContent = 'Report pin: ' + reportLat.toFixed(4) + ', ' + reportLon.toFixed(4);
+        } else {
+            el.textContent = '';
+        }
+    }
+
+    function setReportPin(la, lo) {
+        reportLat = la; reportLon = lo;
+        updatePinCoordsDisplay();
+        if (!reportingMap || !window.L) return;
+        const L_ref = window.L;
+        const pinIcon = L_ref.divIcon({
+            className: '',
+            html: '<div style="font-size:22px; line-height:1; filter:drop-shadow(0 2px 4px #000);">&#128204;</div>',
+            iconAnchor: [11, 22]
+        });
+        if (reportPinMarker) {
+            reportPinMarker.setLatLng([la, lo]);
+        } else {
+            reportPinMarker = L_ref.marker([la, lo], { icon: pinIcon, draggable: true, zIndexOffset: 1000 })
+                .bindTooltip('Report location', { permanent: false })
+                .addTo(reportingMap);
+            reportPinMarker.on('dragend', function(e) {
+                const pos = e.target.getLatLng();
+                reportLat = parseFloat(pos.lat.toFixed(5));
+                reportLon = parseFloat(pos.lng.toFixed(5));
+                updatePinCoordsDisplay();
+            });
+        }
+    }
+
+    function toggleReportingRadar() {
+        if (!reportingRadarLayer || !reportingMap) return;
+        const btn = document.getElementById('radar-toggle-btn');
+        if (radarVisible) {
+            reportingMap.removeLayer(reportingRadarLayer);
+            radarVisible = false;
+            if (btn) { btn.textContent = '\uD83D\uDCE1 Radar OFF'; btn.style.opacity = '0.5'; }
+        } else {
+            reportingRadarLayer.addTo(reportingMap);
+            radarVisible = true;
+            if (btn) { btn.textContent = '\uD83D\uDCE1 Radar ON'; btn.style.opacity = '1'; }
+        }
+    }
+
+    function findMeReporting() {
+        if (!navigator.geolocation) { alert('Geolocation not supported by your browser.'); return; }
+        navigator.geolocation.getCurrentPosition(function(pos) {
+            const la = parseFloat(pos.coords.latitude.toFixed(5));
+            const lo = parseFloat(pos.coords.longitude.toFixed(5));
+            setReportPin(la, lo);
+            if (reportingMap) reportingMap.setView([la, lo], reportingMap.getZoom());
+        }, function() {
+            alert('Could not get your location. Check browser permissions.');
+        }, { enableHighAccuracy: true, timeout: 8000 });
+    }
 
     function initReportingMap() {
         if (reportingMap) { reportingMap.invalidateSize(); return; }
         const L_ref = window.L;
         if (!L_ref) { setTimeout(initReportingMap, 500); return; }
+
+        reportLat = parseFloat(lat); reportLon = parseFloat(lon);
+        updatePinCoordsDisplay();
 
         reportingMap = L_ref.map('reporting-map', { zoomControl: true }).setView([parseFloat(lat), parseFloat(lon)], 8);
 
@@ -2123,9 +2199,10 @@
             attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>', maxZoom: 18, opacity: 0.55
         }).addTo(reportingMap);
 
-        L_ref.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
+        reportingRadarLayer = L_ref.tileLayer('https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png', {
             opacity: 0.65, attribution: 'Radar: IEM', maxZoom: 18
-        }).addTo(reportingMap);
+        });
+        reportingRadarLayer.addTo(reportingMap);
 
         alertPolygonLayer = L_ref.layerGroup().addTo(reportingMap);
         lsrLayer = L_ref.layerGroup().addTo(reportingMap);
@@ -2133,7 +2210,15 @@
 
         L_ref.circleMarker([parseFloat(lat), parseFloat(lon)], {
             radius: 8, fillColor: '#4fc3f7', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
-        }).bindPopup('<b>\uD83D\uDCCD Your Location</b>').addTo(reportingMap);
+        }).bindPopup('<b>\uD83D\uDCCD Home Location</b>').addTo(reportingMap);
+
+        // Place the initial report pin
+        setReportPin(parseFloat(lat), parseFloat(lon));
+
+        // Click map to move report pin
+        reportingMap.on('click', function(e) {
+            setReportPin(parseFloat(e.latlng.lat.toFixed(5)), parseFloat(e.latlng.lng.toFixed(5)));
+        });
 
         loadReportingMapData();
     }
@@ -2165,33 +2250,35 @@
             }
         } catch(e) {}
 
-        // NWS Local Storm Reports via IEM MESONET (CORS-friendly, last 12 hours)
+        // NWS Local Storm Reports via IEM MESONET (CORS-friendly, last 24 hours)
         try {
             lsrLayer.clearLayers();
-            const lsrRes = await fetch('https://mesonet.agron.iastate.edu/geojson/lsr.php?hours=12');
+            const lsrRes = await fetch('https://mesonet.agron.iastate.edu/geojson/lsr.php?hours=24&fmt=geojson');
             if (lsrRes.ok) {
                 const lsrData = await lsrRes.json();
                 const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83E\uDDE0', tstm:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F', fire:'\uD83D\uDD25', ice:'\uD83E\uDDCA' };
                 const userLat = parseFloat(lat), userLon = parseFloat(lon);
+                const cosLat = Math.cos(userLat * Math.PI / 180);
                 (lsrData.features || []).forEach(function(f) {
                     if (!f.geometry || !f.geometry.coordinates) return;
                     const lo = f.geometry.coordinates[0], la = f.geometry.coordinates[1];
-                    // Only show LSRs within ~200 km
-                    const dLat = la - userLat, dLon = lo - userLon;
-                    const approxKm = Math.sqrt(dLat*dLat + dLon*dLon) * 111;
-                    if (approxKm > 200) return;
+                    // Correct distance: account for longitude compression at higher latitudes
+                    const dLatKm = (la - userLat) * 111;
+                    const dLonKm = (lo - userLon) * 111 * cosLat;
+                    const distKm = Math.sqrt(dLatKm*dLatKm + dLonKm*dLonKm);
+                    if (distKm > 300) return;
                     const props = f.properties;
                     const typeKey = (props.typetext || props.type || '').toLowerCase();
                     const emojiKey = Object.keys(LSR_ICONS).find(function(k) { return typeKey.includes(k); });
                     const emoji = emojiKey ? LSR_ICONS[emojiKey] : '\uD83D\uDCCC';
                     const validStr = props.valid ? new Date(props.valid).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-                    const mag = props.magnitude ? ' — ' + props.magnitude + (props.magf || '') : '';
+                    const mag = props.magnitude ? ' \u2014 ' + props.magnitude + (props.magf || '') : '';
                     L_ref.circleMarker([la, lo], { radius: 7, fillColor: '#4fc3f7', color: '#0b1e2d', weight: 1.5, opacity: 1, fillOpacity: 0.9 })
-                        .bindPopup('<b>' + emoji + ' ' + (props.typetext || 'LSR') + mag + '</b><br>' + (props.remark || '(No remark)') + '<br><small style="opacity:0.7;">' + (props.city || '') + (validStr ? ' · ' + validStr : '') + '</small>')
+                        .bindPopup('<b>' + emoji + ' ' + (props.typetext || 'LSR') + mag + '</b><br>' + (props.remark || '(No remark)') + '<br><small style="opacity:0.7;">' + (props.city || '') + (validStr ? ' \u00B7 ' + validStr : '') + '</small>')
                         .addTo(lsrLayer);
                 });
             }
-        } catch(e) {}
+        } catch(e) { console.warn('LSR fetch error:', e); }
 
         // SkyMonitor user reports
         try {
@@ -2223,7 +2310,7 @@
             const res = await fetch(REPORTS_WORKER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ lat: parseFloat(lat), lon: parseFloat(lon), type: type, notes: notes, time: new Date().toISOString() })
+                body: JSON.stringify({ lat: reportLat != null ? reportLat : parseFloat(lat), lon: reportLon != null ? reportLon : parseFloat(lon), type: type, notes: notes, time: new Date().toISOString() })
             });
             if (res.ok) {
                 document.getElementById('report-type').value = '';
