@@ -22,6 +22,8 @@
 
     <!-- Leaflet CSS (v1.0.4 NEW) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
     <style>
         :root { --primary: #4fc3f7; --accent: #ffd54f; --danger: #ff1744; --warning: #ffeb3b; --success: #00e676; --bg: #07131d; }
@@ -229,6 +231,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <!-- Leaflet JS (v1.0.4 NEW) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 </head>
 <body>
     <canvas id="skyCanvas" style="position:fixed; top:0; left:0; pointer-events:none; z-index:-2;"></canvas>
@@ -515,7 +518,7 @@
                 <span><span class="report-legend-dot" style="background:#ff9100;"></span>NWS Short-Fused Alert</span>
                 <span><span class="report-legend-dot" style="background:#4fc3f7;"></span>NWS LSR</span>
                 <span><span class="report-legend-dot" style="background:#00e676;"></span>SkyMonitor Report</span>
-                <span><span class="report-legend-dot" style="background:#4fc3f7; border:2px solid white;"></span>Your Location</span>
+                <span><span class="report-legend-dot" style="background:#4fc3f7; border:2px solid white;"></span>Your Location / Report Pin</span>
             </div>
 
             <div style="font-weight:bold; color:var(--primary); margin-bottom:10px; font-size:0.9em; text-transform:uppercase; letter-spacing:1px;">&#128221; Submit a Report</div>
@@ -2139,23 +2142,8 @@
         updatePinCoordsDisplay();
         if (!reportingMap || !window.L) return;
         const L_ref = window.L;
-        const pinIcon = L_ref.divIcon({
-            className: '',
-            html: '<div style="font-size:22px; line-height:1; filter:drop-shadow(0 2px 4px #000);">&#128204;</div>',
-            iconAnchor: [11, 22]
-        });
         if (reportPinMarker) {
             reportPinMarker.setLatLng([la, lo]);
-        } else {
-            reportPinMarker = L_ref.marker([la, lo], { icon: pinIcon, draggable: true, zIndexOffset: 1000 })
-                .bindTooltip('Report location', { permanent: false })
-                .addTo(reportingMap);
-            reportPinMarker.on('dragend', function(e) {
-                const pos = e.target.getLatLng();
-                reportLat = parseFloat(pos.lat.toFixed(5));
-                reportLon = parseFloat(pos.lng.toFixed(5));
-                updatePinCoordsDisplay();
-            });
         }
     }
 
@@ -2206,16 +2194,40 @@
 
         alertPolygonLayer = L_ref.layerGroup().addTo(reportingMap);
         lsrLayer = L_ref.layerGroup().addTo(reportingMap);
-        userReportLayer = L_ref.layerGroup().addTo(reportingMap);
+        userReportLayer = L_ref.markerClusterGroup({
+            maxClusterRadius: 40,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                return L_ref.divIcon({
+                    html: '<div style="background:#00e676;color:#07131d;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;border:2px solid #07131d;box-shadow:0 2px 6px rgba(0,0,0,0.5);">' + count + '</div>',
+                    className: '',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+            }
+        });
+        reportingMap.addLayer(userReportLayer);
 
-        L_ref.circleMarker([parseFloat(lat), parseFloat(lon)], {
-            radius: 8, fillColor: '#4fc3f7', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.9
-        }).bindPopup('<b>\uD83D\uDCCD Home Location</b>').addTo(reportingMap);
+        const dotIcon = L_ref.divIcon({
+            className: '',
+            html: '<div style="width:16px;height:16px;background:#4fc3f7;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 2px #4fc3f7,0 2px 8px rgba(0,0,0,0.7);cursor:grab;"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+        reportPinMarker = L_ref.marker([parseFloat(lat), parseFloat(lon)], { icon: dotIcon, draggable: true, zIndexOffset: 1000 })
+            .bindTooltip('Report location \u2014 drag or click map to move', { permanent: false })
+            .addTo(reportingMap);
+        reportPinMarker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            reportLat = parseFloat(pos.lat.toFixed(5));
+            reportLon = parseFloat(pos.lng.toFixed(5));
+            updatePinCoordsDisplay();
+        });
 
-        // Place the initial report pin
-        setReportPin(parseFloat(lat), parseFloat(lon));
+        reportLat = parseFloat(lat); reportLon = parseFloat(lon);
+        updatePinCoordsDisplay();
 
-        // Click map to move report pin
+        // Click map to move the dot to that location
         reportingMap.on('click', function(e) {
             setReportPin(parseFloat(e.latlng.lat.toFixed(5)), parseFloat(e.latlng.lng.toFixed(5)));
         });
@@ -2287,11 +2299,19 @@
             if (rRes.ok) {
                 const payload = await rRes.json();
                 const reports = Array.isArray(payload) ? payload : (payload.reports || []);
+                const REPORT_EMOJIS = { 'Hail':'\uD83E\uDDE0', 'Tornado':'\uD83C\uDF2A\uFE0F', 'Wind Damage':'\uD83D\uDCA8', 'Flooding':'\uD83C\uDF0A', 'Heavy Snow':'\u2744\uFE0F', 'Lightning Strike':'\u26A1', 'Other':'\uD83D\uDCCC' };
                 reports.forEach(function(r) {
                     if (r.lat == null || r.lon == null) return;
                     const timeStr = r.time ? new Date(r.time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
-                    L_ref.circleMarker([r.lat, r.lon], { radius: 7, fillColor: '#00e676', color: '#0b1e2d', weight: 1.5, opacity: 1, fillOpacity: 0.9 })
-                        .bindPopup('<b>\uD83D\uDFE2 ' + (r.type || 'User Report') + '</b><br>' + (r.notes || '') + '<br><small style="opacity:0.7;">' + timeStr + '</small>')
+                    const emoji = REPORT_EMOJIS[r.type] || '\uD83D\uDFE2';
+                    const icon = L_ref.divIcon({
+                        html: '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8));">' + emoji + '</div>',
+                        className: '',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+                    L_ref.marker([r.lat, r.lon], { icon: icon })
+                        .bindPopup('<b>' + emoji + ' ' + (r.type || 'User Report') + '</b>' + (r.notes ? '<br>' + r.notes : '') + '<br><small style="opacity:0.7;">' + timeStr + '</small>')
                         .addTo(userReportLayer);
                 });
             }
