@@ -1503,8 +1503,7 @@
             startSkyFX(condition);
             const radarMap = document.getElementById('radar-frame');
             if (radarMap) {
-                const gridX = p.properties.gridX; const gridY = p.properties.gridY;
-                radarMap.src = 'https://radar.weather.gov/ridge/standard/' + wfo.toUpperCase() + '_loop.gif';
+                radarMap.src = 'https://www.rainviewer.com/map.html?loc=' + lat + ',' + lon + ',8&oFa=0&oC=1&oU=0&oCS=1&oF=0&oAP=1&rmt=4&c=3&o=83&lm=1&layer=radar&sm=1&sn=1&hu=false';
             }
         } catch(e) {}
     }
@@ -2143,47 +2142,52 @@
         if (!reportingMap || !window.L) return;
         const L_ref = window.L;
 
-        // NWS alert polygons (shortFused only)
+        // NWS Short-Fused alert polygons via IEM Storm-Based Warnings (always has polygon geometry)
         try {
             alertPolygonLayer.clearLayers();
-            const res = await fetch('https://api.weather.gov/alerts/active?point=' + lat + ',' + lon);
-            if (res.ok) {
-                const data = await res.json();
-                const shortFused = ['flash flood warning','severe thunderstorm warning','special marine warning','tornado warning','extreme wind warning','snow squall warning','dust storm warning'];
-                (data.features || []).forEach(function(f) {
-                    const evt = (f.properties.event || '').toLowerCase();
-                    if (!shortFused.some(function(sf) { return evt.includes(sf); })) return;
+            const sbwRes = await fetch('https://mesonet.agron.iastate.edu/geojson/sbw.geojson');
+            if (sbwRes.ok) {
+                const sbwData = await sbwRes.json();
+                // phenomena codes for short-fused warnings
+                const shortFusedPhenomena = { TO:'#ff1744', SV:'#ff9100', FF:'#00c853', MA:'#29b6f6', SQ:'#81d4fa', EW:'#ff9100', DS:'#c8a800', FA:'#00c853' };
+                (sbwData.features || []).forEach(function(f) {
+                    const ph = (f.properties.phenomena || '').toUpperCase();
+                    const sig = (f.properties.significance || '').toUpperCase();
+                    if (sig !== 'W') return; // warnings only
+                    if (!shortFusedPhenomena[ph]) return;
                     if (!f.geometry) return;
-                    let color = '#ff9100';
-                    if (evt.includes('tornado')) color = '#ff1744';
-                    else if (evt.includes('severe thunderstorm')) color = '#ff9100';
-                    else if (evt.includes('flash flood')) color = '#00c853';
-                    else if (evt.includes('snow squall')) color = '#81d4fa';
-                    L_ref.geoJSON(f.geometry, { style: { color: color, weight: 2, opacity: 0.9, fillOpacity: 0.18 } })
-                        .bindPopup('<b>' + f.properties.event + '</b><br><small>' + (f.properties.headline || '') + '</small>')
+                    const color = shortFusedPhenomena[ph];
+                    const label = f.properties.eventid || ph;
+                    L_ref.geoJSON(f.geometry, { style: { color: color, weight: 2.5, opacity: 0.95, fillOpacity: 0.2 } })
+                        .bindPopup('<b>' + (f.properties.type || ph + ' Warning') + '</b><br><small>Issued by ' + (f.properties.wfo || '') + '<br>Expires: ' + (f.properties.expire ? new Date(f.properties.expire).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '') + '</small>')
                         .addTo(alertPolygonLayer);
                 });
             }
         } catch(e) {}
 
-        // NWS Local Storm Reports
+        // NWS Local Storm Reports via IEM MESONET (CORS-friendly, last 12 hours)
         try {
             lsrLayer.clearLayers();
-            const ext = 1.5;
-            const lsrUrl = 'https://mapservices.weather.noaa.gov/vector/rest/services/obs/nws_local_storm_reports/MapServer/0/query?where=1%3D1&outFields=*&geometry=' + (parseFloat(lon) - ext) + ',' + (parseFloat(lat) - ext) + ',' + (parseFloat(lon) + ext) + ',' + (parseFloat(lat) + ext) + '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outSR=4326&f=geojson';
-            const lsrRes = await fetch(lsrUrl);
+            const lsrRes = await fetch('https://mesonet.agron.iastate.edu/geojson/lsr.php?hours=12');
             if (lsrRes.ok) {
                 const lsrData = await lsrRes.json();
-                const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83E\uDDE0', tstmwnd:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F' };
+                const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83E\uDDE0', tstm:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F', fire:'\uD83D\uDD25', ice:'\uD83E\uDDCA' };
+                const userLat = parseFloat(lat), userLon = parseFloat(lon);
                 (lsrData.features || []).forEach(function(f) {
                     if (!f.geometry || !f.geometry.coordinates) return;
                     const lo = f.geometry.coordinates[0], la = f.geometry.coordinates[1];
+                    // Only show LSRs within ~200 km
+                    const dLat = la - userLat, dLon = lo - userLon;
+                    const approxKm = Math.sqrt(dLat*dLat + dLon*dLon) * 111;
+                    if (approxKm > 200) return;
                     const props = f.properties;
                     const typeKey = (props.typetext || props.type || '').toLowerCase();
                     const emojiKey = Object.keys(LSR_ICONS).find(function(k) { return typeKey.includes(k); });
                     const emoji = emojiKey ? LSR_ICONS[emojiKey] : '\uD83D\uDCCC';
+                    const validStr = props.valid ? new Date(props.valid).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+                    const mag = props.magnitude ? ' — ' + props.magnitude + (props.magf || '') : '';
                     L_ref.circleMarker([la, lo], { radius: 7, fillColor: '#4fc3f7', color: '#0b1e2d', weight: 1.5, opacity: 1, fillOpacity: 0.9 })
-                        .bindPopup('<b>' + emoji + ' ' + (props.typetext || 'LSR') + '</b><br>' + (props.remark || '(No remark)') + '<br><small style="opacity:0.7;">' + (props.valid_time || props.date || '') + '</small>')
+                        .bindPopup('<b>' + emoji + ' ' + (props.typetext || 'LSR') + mag + '</b><br>' + (props.remark || '(No remark)') + '<br><small style="opacity:0.7;">' + (props.city || '') + (validStr ? ' · ' + validStr : '') + '</small>')
                         .addTo(lsrLayer);
                 });
             }
