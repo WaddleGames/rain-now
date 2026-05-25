@@ -330,23 +330,18 @@
         </div>
         <div class="x-axis" style="margin-bottom:30px;"><span>NOW</span><span>15m</span><span>30m</span><span>45m</span><span>60m</span></div>
 
-        <div id="outdoor-score-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-bottom:20px;">
+        <details open id="twc-section">
+            <summary style="color:var(--primary);">5-DAY FORECAST <span style="font-size:0.6em; opacity:0.5; font-weight:normal;">&middot; Powered by TWC</span></summary>
+            <div id="twc-daily-forecast" class="forecast-scroll" style="margin-top:15px;"></div>
+        </details>
+
+        <div id="outdoor-score-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-top:15px;">
             <div style="font-size:0.7em; font-weight:900; color:var(--success); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">&#127804; OUTDOOR SCORE</div>
             <div style="display:flex; align-items:baseline; gap:6px;">
                 <span id="outdoor-score-val" style="font-size:2.5em; font-weight:900; color:var(--accent);">--</span>
                 <span style="font-size:1em; color:#888;">/100</span>
             </div>
             <div id="outdoor-score-desc" style="font-size:0.8em; color:#aaa; margin-top:4px;"></div>
-        </div>
-
-        <details open id="twc-section">
-            <summary style="color:var(--primary);">5-DAY FORECAST <span style="font-size:0.6em; opacity:0.5; font-weight:normal;">&middot; Powered by TWC</span></summary>
-            <div id="twc-daily-forecast" class="forecast-scroll" style="margin-top:15px;"></div>
-        </details>
-
-        <div id="outdoor-window-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-top:15px;">
-            <div style="font-size:0.7em; font-weight:900; color:var(--success); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">&#127939; BEST OUTDOOR WINDOW</div>
-            <div id="outdoor-window-text" style="font-size:0.9em; color:#ddd;"></div>
         </div>
     </div>
 
@@ -2049,10 +2044,14 @@
 
         // v1.0.4: Swipe between days (only horizontal swipes — ignore scroll)
         const inner = document.getElementById('twc-modal-inner');
-        let twcTouchX = 0, twcTouchY = 0;
-        inner.addEventListener('touchstart', function(e) { twcTouchX = e.touches[0].clientX; twcTouchY = e.touches[0].clientY; }, { passive: true });
+        let twcTouchX = 0, twcTouchY = 0, twcTouchInScroll = false;
+        inner.addEventListener('touchstart', function(e) {
+            twcTouchX = e.touches[0].clientX;
+            twcTouchY = e.touches[0].clientY;
+            twcTouchInScroll = !!e.target.closest('.forecast-scroll');
+        }, { passive: true });
         inner.addEventListener('touchend', function(e) {
-            if (!swipeEnabled) return;
+            if (!swipeEnabled || twcTouchInScroll) return;
             const dx = e.changedTouches[0].clientX - twcTouchX;
             const dy = e.changedTouches[0].clientY - twcTouchY;
             if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
@@ -2545,7 +2544,7 @@
             const lsrRes = await fetch('https://mesonet.agron.iastate.edu/geojson/lsr.php?hours=24&fmt=geojson');
             if (lsrRes.ok) {
                 const lsrData = await lsrRes.json();
-                const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83E\uDDE0', tstm:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F', fire:'\uD83D\uDD25', ice:'\uD83E\uDDCA' };
+                const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83C\uDF28\uFE0F', tstm:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F', fire:'\uD83D\uDD25', ice:'\uD83E\uDDCA' };
                 (lsrData.features || []).forEach(function(f) {
                     if (!f.geometry || !f.geometry.coordinates) return;
                     const lo = f.geometry.coordinates[0], la = f.geometry.coordinates[1];
