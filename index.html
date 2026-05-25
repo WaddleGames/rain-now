@@ -274,11 +274,14 @@
             </div>
         </div>
         <div class="settings-row">
-            <span class="settings-label">Swipe to Switch Tabs</span>
+            <span class="settings-label">Enable Swiping</span>
             <div class="btn-group">
                 <button id="opt-swipe-on" class="btn-opt active" onclick="setSwipeSetting(true)">ON</button>
                 <button id="opt-swipe-off" class="btn-opt" onclick="setSwipeSetting(false)">OFF</button>
             </div>
+        </div>
+        <div style="margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.06); text-align:center; font-size:0.65em; color:#445566;">
+            Created by <a href="https://youtube.com/@chicagoareaEAS" target="_blank" style="color:#556677; text-decoration:none;">@chicagoareaEAS</a> on YouTube
         </div>
     </div>
 
@@ -311,7 +314,7 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:10px;">
             <div>
                 <div style="text-align:left; font-weight:bold; color:var(--primary); display:flex; align-items:center; gap:8px;">
-                    MINUTE-PRECIP
+                    MINUTELY
                     <div id="precip24h" style="font-size:0.65em; background:rgba(255,213,79,0.2); color:white; padding:2px 6px; border-radius:4px; font-weight:normal; display:inline-block;">24h: --</div>
                 </div>
                 <div id="minuteSummary" style="text-align:left; font-size:1em; color:var(--accent);">--</div>
@@ -327,15 +330,24 @@
         </div>
         <div class="x-axis" style="margin-bottom:30px;"><span>NOW</span><span>15m</span><span>30m</span><span>45m</span><span>60m</span></div>
 
-        <div id="outdoor-window-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-bottom:20px;">
-            <div style="font-size:0.7em; font-weight:900; color:var(--success); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">&#127939; BEST OUTDOOR WINDOW</div>
-            <div id="outdoor-window-text" style="font-size:0.9em; color:#ddd;"></div>
+        <div id="outdoor-score-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-bottom:20px;">
+            <div style="font-size:0.7em; font-weight:900; color:var(--success); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px;">&#127804; OUTDOOR SCORE</div>
+            <div style="display:flex; align-items:baseline; gap:6px;">
+                <span id="outdoor-score-val" style="font-size:2.5em; font-weight:900; color:var(--accent);">--</span>
+                <span style="font-size:1em; color:#888;">/100</span>
+            </div>
+            <div id="outdoor-score-desc" style="font-size:0.8em; color:#aaa; margin-top:4px;"></div>
         </div>
 
         <details open id="twc-section">
-            <summary style="color:var(--primary);">5-DAY FORECAST (TWC)</summary>
+            <summary style="color:var(--primary);">5-DAY FORECAST <span style="font-size:0.6em; opacity:0.5; font-weight:normal;">&middot; Powered by TWC</span></summary>
             <div id="twc-daily-forecast" class="forecast-scroll" style="margin-top:15px;"></div>
         </details>
+
+        <div id="outdoor-window-box" style="display:none; background:rgba(0,230,118,0.07); border:1px solid rgba(0,230,118,0.25); border-radius:15px; padding:14px 18px; margin-top:15px;">
+            <div style="font-size:0.7em; font-weight:900; color:var(--success); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">&#127939; BEST OUTDOOR WINDOW</div>
+            <div id="outdoor-window-text" style="font-size:0.9em; color:#ddd;"></div>
+        </div>
     </div>
 
     <!-- SEVERE TAB -->
@@ -363,7 +375,7 @@
         <!-- v1.0.4: Simplified lightning panel — no radar canvas, inline risk label -->
         <div class="toolkit-box" id="lightning-panel" style="position:relative; overflow:hidden; margin-bottom:20px;">
             <div class="toolkit-header" style="margin-bottom:14px;">
-                <span>&#128225; STORM PROXIMITY &amp; &#9889; LIGHTNING ESTIMATOR</span>
+                <span>&#9889; STORM ESTIMATOR</span>
                 <span id="storm-status-tag" style="background:rgba(0,0,0,0.4); color:var(--success); padding:4px 8px; border-radius:6px; font-size:0.7em; font-weight:bold; white-space:nowrap;">CLEAR SCAN</span>
             </div>
 
@@ -422,8 +434,9 @@
 
     <!-- SPECS TAB -->
     <div id="specs-tab" class="tab-content">
-        <div class="toolkit-box">
+        <div id="station-intel-box" class="toolkit-box">
             <div class="toolkit-header"><span>&#128225; STATION INTEL</span></div>
+            <!-- shown only in Advanced mode -->
             <div style="font-family:monospace; font-size:0.85em; color:#ddd; line-height:1.6;">
                 <div><b>Station Name:</b> <span id="meta-name" style="color:var(--accent);">--</span></div>
                 <div><b>Identifier:</b> <span id="meta-id">--</span></div>
@@ -462,7 +475,14 @@
         </div>
 
         <div id="wxstory-section">
-            <div style="font-weight:bold; color:var(--primary); margin-bottom:10px;">LOCAL WEATHER STORY</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div style="font-weight:bold; color:var(--primary);">LOCAL WEATHER STORY</div>
+                <div style="display:flex; gap:5px;">
+                    <button onclick="wxStoryPrev()" title="Previous" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9664;</button>
+                    <button id="wxstory-playpause" onclick="wxStoryTogglePause()" title="Play/Pause" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9646;&#9646;</button>
+                    <button onclick="wxStoryNext()" title="Next" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9654;</button>
+                </div>
+            </div>
             <a id="wxstory-link" target="_blank">
                 <div style="background:#111; border-radius:15px; overflow:hidden; border:1px solid #333; margin-bottom:20px;">
                     <img id="wxstory-img" style="width:100%; display:block; min-height:200px;">
@@ -512,13 +532,17 @@
                     <button onclick="loadReportingMapData()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#8635;</button>
                     <button id="radar-toggle-btn" onclick="toggleReportingRadar()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#128225; Radar ON</button>
                     <button id="alerts-toggle-btn" onclick="toggleAlertPolygons()" style="background:rgba(255,145,0,0.15); border:1px solid #ff9100; color:#ff9100; padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#9888;&#65039; Alerts ON</button>
+                    <button id="lsr-toggle-btn" onclick="toggleLSR()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.75em; cursor:pointer;">&#128204; LSR ON</button>
                 </div>
             </div>
 
             <div id="reporting-map"></div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; margin-bottom:4px;">
-                <div style="font-size:0.72em; color:#aaa;">&#128204; Click map to pin report location</div>
-                <button onclick="findMeReporting()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.72em; cursor:pointer;">&#128205; Find Me</button>
+                <div id="report-pin-instruction" style="font-size:0.72em; color:#aaa;">&#128204; Tap map to pin location</div>
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <button onclick="findMeReporting()" style="background:rgba(79,195,247,0.15); border:1px solid var(--primary); color:var(--primary); padding:4px 10px; border-radius:6px; font-size:0.72em; cursor:pointer;">&#128205; Find Me</button>
+                    <label style="font-size:0.68em; color:#888; display:flex; align-items:center; gap:4px; cursor:pointer; white-space:nowrap;"><input type="checkbox" id="privacy-mode-cb" style="margin:0;"> Privacy Mode</label>
+                </div>
             </div>
             <div id="report-pin-coords" style="font-size:0.7em; color:#4fc3f7; text-align:center; margin-bottom:8px; min-height:1em;"></div>
 
@@ -561,7 +585,6 @@
         <span style="margin:0 8px; opacity:0.3;">|</span>
         ALPHA RELEASE - v1.0.4
     </div>
-    <p style="margin:0;">Created by <a href="https://youtube.com/@chicagoareaEAS" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:bold;">@chicagoareaEAS</a> on YouTube</p>
     <p style="font-size:0.75em; margin-top:10px; opacity:0.5;">Accurate weather, simplified.</p>
 </footer>
 
@@ -629,6 +652,14 @@
         const win = document.getElementById('settings-window');
         win.style.display = win.style.display === 'block' ? 'none' : 'block';
     }
+    document.addEventListener('click', function(e) {
+        const win = document.getElementById('settings-window');
+        if (win && win.style.display === 'block') {
+            if (!win.contains(e.target) && !e.target.closest('[onclick*="toggleSettingsWindow"]')) {
+                win.style.display = 'none';
+            }
+        }
+    }, true);
 
     function setInputView(mode) {
         const panel = document.getElementById('coords-panel');
@@ -672,6 +703,9 @@
         // v1.0.4: Show/hide analytics section based on mode
         const analyticsSection = document.getElementById('analytics-section');
         if (analyticsSection) analyticsSection.style.display = (mode === 'specific') ? 'block' : 'none';
+        // Station Intel: Advanced mode only
+        const stationIntelBox = document.getElementById('station-intel-box');
+        if (stationIntelBox) stationIntelBox.style.display = (mode === 'specific') ? '' : 'none';
         loadAll();
     }
 
@@ -816,12 +850,46 @@
                     return getNum(a) - getNum(b);
                 });
             if (validImages.length === 0) throw new Error('No valid images');
-            let index = 0;
-            function showImage() { const fullUrl = validImages[index]; storyImg.src = 'https://images.weserv.nl/?url=' + fullUrl.replace('https://', '') + '&t=' + Date.now(); storyLink.href = fullUrl; }
+            window._wxStoryImages = validImages;
+            window._wxStoryIndex = 0;
+            window._wxPaused = false;
+            const ppBtn = document.getElementById('wxstory-playpause');
+            if (ppBtn) ppBtn.innerHTML = '&#9646;&#9646;';
+            function showImage() {
+                const fullUrl = validImages[window._wxStoryIndex];
+                storyImg.src = 'https://images.weserv.nl/?url=' + fullUrl.replace('https://', '') + '&t=' + Date.now();
+                storyLink.href = fullUrl;
+            }
             showImage();
             if (window.wxStoryInterval) clearInterval(window.wxStoryInterval);
-            window.wxStoryInterval = setInterval(function() { index = (index + 1) % validImages.length; showImage(); }, 5000);
+            window.wxStoryInterval = setInterval(function() {
+                if (!window._wxPaused) {
+                    window._wxStoryIndex = (window._wxStoryIndex + 1) % validImages.length;
+                    showImage();
+                }
+            }, 5000);
         } catch(e) { storyImg.src = ''; }
+    }
+    function wxStoryTogglePause() {
+        window._wxPaused = !window._wxPaused;
+        const btn = document.getElementById('wxstory-playpause');
+        if (btn) btn.innerHTML = window._wxPaused ? '&#9654;' : '&#9646;&#9646;';
+    }
+    function wxStoryNext() {
+        if (!window._wxStoryImages || !window._wxStoryImages.length) return;
+        window._wxStoryIndex = (window._wxStoryIndex + 1) % window._wxStoryImages.length;
+        const fullUrl = window._wxStoryImages[window._wxStoryIndex];
+        const img = document.getElementById('wxstory-img'); const lnk = document.getElementById('wxstory-link');
+        if (img) img.src = 'https://images.weserv.nl/?url=' + fullUrl.replace('https://', '') + '&t=' + Date.now();
+        if (lnk) lnk.href = fullUrl;
+    }
+    function wxStoryPrev() {
+        if (!window._wxStoryImages || !window._wxStoryImages.length) return;
+        window._wxStoryIndex = (window._wxStoryIndex - 1 + window._wxStoryImages.length) % window._wxStoryImages.length;
+        const fullUrl = window._wxStoryImages[window._wxStoryIndex];
+        const img = document.getElementById('wxstory-img'); const lnk = document.getElementById('wxstory-link');
+        if (img) img.src = 'https://images.weserv.nl/?url=' + fullUrl.replace('https://', '') + '&t=' + Date.now();
+        if (lnk) lnk.href = fullUrl;
     }
 
     function getMoonPhaseName(phase) {
@@ -938,11 +1006,8 @@
             const h = Math.floor(diff / (1000 * 60 * 60));
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)).toString().padStart(2, '0');
             const s = Math.floor((diff % (1000 * 60)) / 1000).toString().padStart(2, '0');
-            // v1.0.4: exact UTC time + Tomorrow if applicable
-            const utcHH = Math.floor(nextUpdateHour).toString().padStart(2, '0');
-            const utcMM = Math.round((nextUpdateHour % 1) * 60).toString().padStart(2, '0');
-            const tomorrowStr = isTomorrow ? ' Tomorrow' : '';
-            countdownElem.innerText = 'Next: ' + h + 'h ' + m + 'm ' + s + 's @' + tomorrowStr + ' ' + utcHH + ':' + utcMM + 'Z';
+            const localTimeStr = nextDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+            countdownElem.innerText = 'Next: ' + h + 'h ' + m + 'm ' + s + 's @ ' + localTimeStr + (isTomorrow ? ' Tomorrow' : '');
         }
         updateSPC();
         spcIntervalId = setInterval(updateSPC, 1000);
@@ -1040,6 +1105,34 @@
         ['spc-outlook-section','wxstory-section','afd-section'].forEach(function(id) {
             const el = document.getElementById(id); if (el) el.style.display = '';
         });
+    }
+
+    function computeOutdoorScore(hourlyData) {
+        const now = Math.floor(Date.now() / 1000);
+        const todayHours = hourlyData.filter(function(h) {
+            return h.time >= now - 3600 && h.time <= now + 18 * 3600;
+        }).slice(0, 18);
+        const boxEl = document.getElementById('outdoor-score-box');
+        if (!todayHours.length || !boxEl) return;
+        function scoreHour(h) {
+            let score = 100;
+            const pp = (h.precipProbability || 0) * 100;
+            const fl = h.apparentTemperature || h.temperature || 70;
+            const w = h.windSpeed || 0;
+            const uv = h.uvIndex || 0;
+            if (pp > 70) score -= 40; else if (pp > 40) score -= 25; else if (pp > 20) score -= 10;
+            if (fl >= 65 && fl <= 82) {} else if (fl >= 55 && fl <= 90) score -= 8; else if (fl < 40 || fl > 95) score -= 30; else score -= 18;
+            if (w > 25) score -= 20; else if (w > 15) score -= 10; else if (w > 8) score -= 3;
+            if (uv >= 10) score -= 10; else if (uv >= 7) score -= 5; else if (uv >= 5) score -= 2;
+            return Math.max(0, Math.min(100, score));
+        }
+        const avgScore = Math.round(todayHours.reduce(function(s, h) { return s + scoreHour(h); }, 0) / todayHours.length);
+        const scoreEl = document.getElementById('outdoor-score-val');
+        const descEl = document.getElementById('outdoor-score-desc');
+        if (scoreEl) scoreEl.innerText = avgScore;
+        const desc = avgScore >= 85 ? 'Great day to be outside!' : avgScore >= 65 ? 'Decent conditions overall' : avgScore >= 45 ? 'Marginal — some discomfort expected' : 'Not ideal for outdoor activity';
+        if (descEl) descEl.innerText = desc;
+        boxEl.style.display = 'block';
     }
 
     // v1.0.4: Only show outdoor window 9am–6pm station local time
@@ -1333,6 +1426,9 @@
                 document.getElementById('precip1h').innerText = 'RR: ' + wu.precipRate.toFixed(2) + '"/hr  ' + document.getElementById('precip1h').innerText;
                 document.getElementById('precip24h').innerText = 'Past: ' + wu.precipTotal.toFixed(2) + '"  ' + document.getElementById('precip24h').innerText;
             }
+            // Hide boxes when value is effectively zero
+            document.getElementById('precip1h').style.display = (precip1h > 0.005 || (wuPrecipValid && wu.precipRate > 0)) ? '' : 'none';
+            document.getElementById('precip24h').style.display = (precip24h > 0.005 || (wuPrecipValid && wu.precipTotal > 0)) ? '' : 'none';
             livePrecipInt = d.currently?.precipIntensity || 0;
             document.getElementById('minuteSummary').innerText = d.minutely?.summary || 'Conditions holding steady.';
             const timeline = document.getElementById('timeline'); timeline.innerHTML = '';
@@ -1404,6 +1500,7 @@
                 window.pirateHourlyData = d.hourly.data;
                 window.pirateTimezoneOffset = d.offset || 0;
                 computeOutdoorWindow(d.hourly.data, d.offset || 0);
+                computeOutdoorScore(d.hourly.data);
             }
             updateSmartComfort(Math.round(temp), liveFeelsLike, Math.round(humidity), liveWindSpd, curr.summary || '', liveUV);
         } catch(e) {}
@@ -1944,20 +2041,21 @@
             ].filter(Boolean);
             html += '<div style="margin-top:13px; text-align:center;"><div style="font-size:1.15em;font-weight:bold; color:' + (part === 0 ? '#ffd54f' : '#bbb') + '">' + titles[part] + '</div><img src="https://www.wunderground.com/static/i/c/v4/' + (icons[part] ? icons[part] : '50') + '.svg" style="width:64px;height:64px;margin:0 auto;"><div style="font-size:1.5em; margin:0.25em 0; color:var(--accent);font-weight:bold;">' + (highs[part] !== undefined ? highs[part] + '\u00b0' : '--') + ' / ' + lohi[part] + '\u00b0</div><div style="font-size:1.05em; margin-bottom:9px;">' + (narratives[part] ?? '--') + '</div><div style="font-size:.9em;opacity:.85;"><strong>Precip Chance:</strong> ' + (precip[part] !== undefined ? precip[part] + '%' : '--') + ' &nbsp;&middot;&nbsp; <strong>Amount:</strong> ' + (qpf[part] !== undefined ? qpf[part] + '"' : '--') + '</div>' + (detailRows.length ? '<div style="font-size:0.82em;text-align:left;margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;">' + detailRows.join('') + '</div>' : '') + '</div>';
         }
-        html += '<hr style="margin:14px 0;"><div style="margin:0;margin-top:-5px;font-weight:bold;">Hourly (PirateWeather):</div><div id="twc-hourly-placeholder"><em>Loading...</em></div>';
+        html += '<hr style="margin:14px 0;"><div style="margin:0;margin-top:-5px;font-weight:bold;">Hourly <span style="font-size:0.75em;opacity:0.5;font-weight:normal;">· Powered by PirateWeather</span></div><div id="twc-hourly-placeholder"><em>Loading...</em></div>';
         document.getElementById('twc-modal-inner').innerHTML = html;
 
         document.getElementById('twc-prev-btn').onclick = function(e) { e.stopPropagation(); openTWCDetailModal(data, (dayIdx - 1 + data.dayOfWeek.length) % data.dayOfWeek.length); };
         document.getElementById('twc-next-btn').onclick = function(e) { e.stopPropagation(); openTWCDetailModal(data, (dayIdx + 1) % data.dayOfWeek.length); };
 
-        // v1.0.4: Swipe between days
+        // v1.0.4: Swipe between days (only horizontal swipes — ignore scroll)
         const inner = document.getElementById('twc-modal-inner');
-        let twcTouchX = 0;
-        inner.addEventListener('touchstart', function(e) { twcTouchX = e.touches[0].clientX; }, { passive: true });
+        let twcTouchX = 0, twcTouchY = 0;
+        inner.addEventListener('touchstart', function(e) { twcTouchX = e.touches[0].clientX; twcTouchY = e.touches[0].clientY; }, { passive: true });
         inner.addEventListener('touchend', function(e) {
             if (!swipeEnabled) return;
             const dx = e.changedTouches[0].clientX - twcTouchX;
-            if (Math.abs(dx) > 50) {
+            const dy = e.changedTouches[0].clientY - twcTouchY;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
                 if (dx < 0) openTWCDetailModal(data, (dayIdx + 1) % data.dayOfWeek.length);
                 else openTWCDetailModal(data, (dayIdx - 1 + data.dayOfWeek.length) % data.dayOfWeek.length);
             }
@@ -2046,19 +2144,23 @@
                 return '<button id="comfort-tab-' + i + '" onclick="(function(idx){document.querySelectorAll(\'#comfort-day-tabs .btn-opt\').forEach(function(b){b.classList.remove(\'active\')});document.getElementById(\'comfort-tab-\'+idx).classList.add(\'active\');document.getElementById(\'comfort-hours\').innerHTML=window._comfortDayHtml[\'' + key + '\']; window._comfortDayIdx=idx;})(' + i + ')" class="btn-opt' + (key === activeKey ? ' active' : '') + '">' + label + '</button>';
             }).join('');
             document.getElementById('comfort-modal-inner').innerHTML = '<button onclick="document.getElementById(\'comfort-modal\').style.display=\'none\'; window._modalOpen=false;" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">HOURLY COMFORT INDEX</div><div id="comfort-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="comfort-hours">' + (window._comfortDayHtml[activeKey] || '') + '</div><div style="font-size:0.6em;opacity:0.4;text-align:center;margin-top:10px;">Powered by PirateWeather</div>';
-            // v1.0.4: Swipe between day tabs
+            // v1.0.4: Swipe between day tabs (attach once to avoid stacking)
             const inner = document.getElementById('comfort-modal-inner');
-            let cTouchX = 0;
-            inner.addEventListener('touchstart', function(e) { cTouchX = e.touches[0].clientX; }, { passive: true });
-            inner.addEventListener('touchend', function(e) {
-                if (!swipeEnabled) return;
-                const dx = e.changedTouches[0].clientX - cTouchX;
-                if (Math.abs(dx) > 50) {
-                    const newIdx = Math.max(0, Math.min(dayKeys.length - 1, (window._comfortDayIdx || 0) + (dx < 0 ? 1 : -1)));
-                    const btn = document.getElementById('comfort-tab-' + newIdx);
-                    if (btn) btn.click();
-                }
-            }, { passive: true });
+            if (!inner._swipeAttached) {
+                inner._swipeAttached = true;
+                let cTouchX = 0, cTouchY = 0;
+                inner.addEventListener('touchstart', function(e) { cTouchX = e.touches[0].clientX; cTouchY = e.touches[0].clientY; }, { passive: true });
+                inner.addEventListener('touchend', function(e) {
+                    if (!swipeEnabled) return;
+                    const dx = e.changedTouches[0].clientX - cTouchX;
+                    const dy = e.changedTouches[0].clientY - cTouchY;
+                    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                        const newIdx = Math.max(0, Math.min(dayKeys.length - 1, (window._comfortDayIdx || 0) + (dx < 0 ? 1 : -1)));
+                        const btn = document.getElementById('comfort-tab-' + newIdx);
+                        if (btn) btn.click();
+                    }
+                }, { passive: true });
+            }
         }
         renderComfortModal(dayKeys[0]);
     }
@@ -2110,19 +2212,23 @@
         }).join('');
         document.getElementById('uv-modal-inner').innerHTML = '<button onclick="document.getElementById(\'uv-modal\').style.display=\'none\'; window._modalOpen=false;" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">\u2600\uFE0F HOURLY UV INDEX</div><div id="uv-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="uv-hours">' + (window._uvDayHtml[dayKeys[0]] || '') + '</div><div style="font-size:0.6em;opacity:0.4;text-align:center;margin-top:10px;">Powered by PirateWeather</div>';
         window._uvDayIdx = 0;
-        // v1.0.4: Swipe between day tabs
+        // v1.0.4: Swipe between day tabs (attach once to avoid stacking)
         const inner = document.getElementById('uv-modal-inner');
-        let uvTouchX = 0;
-        inner.addEventListener('touchstart', function(e) { uvTouchX = e.touches[0].clientX; }, { passive: true });
-        inner.addEventListener('touchend', function(e) {
-            if (!swipeEnabled) return;
-            const dx = e.changedTouches[0].clientX - uvTouchX;
-            if (Math.abs(dx) > 50) {
-                const newIdx = Math.max(0, Math.min(dayKeys.length - 1, (window._uvDayIdx || 0) + (dx < 0 ? 1 : -1)));
-                const btn = document.getElementById('uv-tab-' + newIdx);
-                if (btn) btn.click();
-            }
-        }, { passive: true });
+        if (!inner._swipeAttached) {
+            inner._swipeAttached = true;
+            let uvTouchX = 0, uvTouchY = 0;
+            inner.addEventListener('touchstart', function(e) { uvTouchX = e.touches[0].clientX; uvTouchY = e.touches[0].clientY; }, { passive: true });
+            inner.addEventListener('touchend', function(e) {
+                if (!swipeEnabled) return;
+                const dx = e.changedTouches[0].clientX - uvTouchX;
+                const dy = e.changedTouches[0].clientY - uvTouchY;
+                if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                    const newIdx = Math.max(0, Math.min(dayKeys.length - 1, (window._uvDayIdx || 0) + (dx < 0 ? 1 : -1)));
+                    const btn = document.getElementById('uv-tab-' + newIdx);
+                    if (btn) btn.click();
+                }
+            }, { passive: true });
+        }
     }
 
     // ——— v1.0.4 NEW: REPORTING MAP ———
@@ -2142,7 +2248,7 @@
         { type: 'Thunderstorm', emoji: '\u26C8\uFE0F', label: 'Thunderstorm' },
         { type: 'Wind Damage', emoji: '\uD83D\uDCA8', label: 'Wind Damage' },
         { type: 'Flooding', emoji: '\uD83C\uDF0A', label: 'Flooding' },
-        { type: 'Hail', emoji: '\uD83E\uDDCA', label: 'Hail', sub: {
+        { type: 'Hail', emoji: '\uD83E\uDDE0', label: 'Hail', sub: {
             label: 'Select hail size:',
             options: [
                 { type: 'Hail \u2014 Pea (\u00BC")', label: 'Pea \u00BC"' },
@@ -2232,6 +2338,31 @@
         });
     }
 
+    function formatReportTime(isoString) {
+        if (!isoString) return '';
+        const reportDate = new Date(isoString);
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const reportMidnight = new Date(reportDate.getFullYear(), reportDate.getMonth(), reportDate.getDate()).getTime();
+        const timeStr = reportDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        if (reportMidnight < todayMidnight) return 'Yesterday ' + timeStr;
+        return timeStr;
+    }
+
+    let lsrVisible = true;
+    function toggleLSR() {
+        if (!lsrLayer || !reportingMap) return;
+        lsrVisible = !lsrVisible;
+        const btn = document.getElementById('lsr-toggle-btn');
+        if (lsrVisible) {
+            reportingMap.addLayer(lsrLayer);
+            if (btn) { btn.textContent = '\uD83D\uDCCC LSR ON'; btn.style.opacity = '1'; }
+        } else {
+            reportingMap.removeLayer(lsrLayer);
+            if (btn) { btn.textContent = '\uD83D\uDCCC LSR OFF'; btn.style.opacity = '0.45'; }
+        }
+    }
+
     function toggleAlertPolygons() {
         if (!alertPolygonLayer || !reportingMap) return;
         const btn = document.getElementById('alerts-toggle-btn');
@@ -2282,11 +2413,32 @@
 
     function findMeReporting() {
         if (!navigator.geolocation) { alert('Geolocation not supported by your browser.'); return; }
+        const privacyMode = document.getElementById('privacy-mode-cb')?.checked;
         navigator.geolocation.getCurrentPosition(function(pos) {
-            const la = parseFloat(pos.coords.latitude.toFixed(5));
-            const lo = parseFloat(pos.coords.longitude.toFixed(5));
-            setReportPin(la, lo);
-            if (reportingMap) reportingMap.setView([la, lo], reportingMap.getZoom());
+            const rawLa = pos.coords.latitude;
+            const rawLo = pos.coords.longitude;
+            if (privacyMode) {
+                // Privacy Mode: snap to city center via Nominatim reverse geocode at city zoom
+                fetch('https://nominatim.openstreetmap.org/reverse?lat=' + rawLa + '&lon=' + rawLo + '&zoom=10&format=json')
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        const la = parseFloat(parseFloat(data.lat).toFixed(5));
+                        const lo = parseFloat(parseFloat(data.lon).toFixed(5));
+                        setReportPin(la, lo);
+                        if (reportingMap) reportingMap.setView([la, lo], reportingMap.getZoom());
+                    })
+                    .catch(function() { alert('Could not resolve city center. Try again.'); });
+            } else {
+                // Default: apply ~400m random offset for basic privacy
+                const offsetMeters = 350 + Math.random() * 150;
+                const angle = Math.random() * 2 * Math.PI;
+                const dLat = (offsetMeters * Math.cos(angle)) / 111000;
+                const dLon = (offsetMeters * Math.sin(angle)) / (111000 * Math.cos(rawLa * Math.PI / 180));
+                const la = parseFloat((rawLa + dLat).toFixed(5));
+                const lo = parseFloat((rawLo + dLon).toFixed(5));
+                setReportPin(la, lo);
+                if (reportingMap) reportingMap.setView([la, lo], reportingMap.getZoom());
+            }
         }, function() {
             alert('Could not get your location. Check browser permissions.');
         }, { enableHighAccuracy: true, timeout: 8000 });
@@ -2333,8 +2485,12 @@
             iconSize: [16, 16],
             iconAnchor: [8, 8]
         });
-        reportPinMarker = L_ref.marker([parseFloat(lat), parseFloat(lon)], { icon: dotIcon, draggable: true, zIndexOffset: 1000 })
-            .bindTooltip('Report location \u2014 drag or click map to move', { permanent: false })
+        const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        const instrEl = document.getElementById('report-pin-instruction');
+        if (instrEl) instrEl.innerText = isMobile ? '\uD83D\uDCCC Tap map to pin location' : '\uD83D\uDCCC Drag the pin to set location';
+
+        reportPinMarker = L_ref.marker([parseFloat(lat), parseFloat(lon)], { icon: dotIcon, draggable: !isMobile, zIndexOffset: 1000 })
+            .bindTooltip('Report location', { permanent: false })
             .addTo(reportingMap);
         reportPinMarker.on('dragend', function(e) {
             const pos = e.target.getLatLng();
@@ -2346,10 +2502,12 @@
         reportLat = parseFloat(lat); reportLon = parseFloat(lon);
         updatePinCoordsDisplay();
 
-        // Click map to move the dot to that location
-        reportingMap.on('click', function(e) {
-            setReportPin(parseFloat(e.latlng.lat.toFixed(5)), parseFloat(e.latlng.lng.toFixed(5)));
-        });
+        // Mobile: tap map to move pin. Desktop: drag only.
+        if (isMobile) {
+            reportingMap.on('click', function(e) {
+                setReportPin(parseFloat(e.latlng.lat.toFixed(5)), parseFloat(e.latlng.lng.toFixed(5)));
+            });
+        }
 
         loadReportingMapData();
     }
@@ -2388,22 +2546,17 @@
             if (lsrRes.ok) {
                 const lsrData = await lsrRes.json();
                 const LSR_ICONS = { tornado:'\uD83C\uDF2A\uFE0F', hail:'\uD83E\uDDE0', tstm:'\uD83D\uDCA8', wind:'\uD83D\uDCA8', flood:'\uD83C\uDF0A', snow:'\u2744\uFE0F', rain:'\uD83C\uDF27\uFE0F', fire:'\uD83D\uDD25', ice:'\uD83E\uDDCA' };
-                const userLat = parseFloat(lat), userLon = parseFloat(lon);
-                const cosLat = Math.cos(userLat * Math.PI / 180);
                 (lsrData.features || []).forEach(function(f) {
                     if (!f.geometry || !f.geometry.coordinates) return;
                     const lo = f.geometry.coordinates[0], la = f.geometry.coordinates[1];
-                    // Correct distance: account for longitude compression at higher latitudes
-                    const dLatKm = (la - userLat) * 111;
-                    const dLonKm = (lo - userLon) * 111 * cosLat;
-                    const distKm = Math.sqrt(dLatKm*dLatKm + dLonKm*dLonKm);
-                    if (distKm > 300) return;
                     const props = f.properties;
                     const typeKey = (props.typetext || props.type || '').toLowerCase();
                     const emojiKey = Object.keys(LSR_ICONS).find(function(k) { return typeKey.includes(k); });
                     const emoji = emojiKey ? LSR_ICONS[emojiKey] : '\uD83D\uDCCC';
-                    const validStr = props.valid ? new Date(props.valid).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-                    const mag = props.magnitude ? ' \u2014 ' + props.magnitude + (props.magf || '') : '';
+                    const validStr = formatReportTime(props.valid);
+                    // Fix magnitude duplication: only append magf if it's not a number
+                    const magf = props.magf && isNaN(Number(props.magf)) ? ' ' + props.magf : '';
+                    const mag = props.magnitude ? ' \u2014 ' + props.magnitude + magf : '';
                     L_ref.circleMarker([la, lo], { radius: 7, fillColor: '#4fc3f7', color: '#0b1e2d', weight: 1.5, opacity: 1, fillOpacity: 0.9 })
                         .bindPopup('<b>' + emoji + ' ' + (props.typetext || 'LSR') + mag + '</b><br>' + (props.remark || '(No remark)') + '<br><small style="opacity:0.7;">' + (props.city || '') + (validStr ? ' \u00B7 ' + validStr : '') + '</small>')
                         .addTo(lsrLayer);
@@ -2435,7 +2588,7 @@
                 }
                 reports.forEach(function(r) {
                     if (r.lat == null || r.lon == null) return;
-                    const timeStr = r.time ? new Date(r.time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
+                    const timeStr = formatReportTime(r.time);
                     const emoji = getReportEmoji(r.type);
                     const icon = L_ref.divIcon({
                         html: '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8));">' + emoji + '</div>',
@@ -2509,6 +2662,7 @@
     let currentTabIdx = 0;
     let ptr_startY = 0, ptr_pulling = false;
     let swipeLocked = false;
+    let touchOnMap = false;
     let swipeEnabled = localStorage.getItem('skymonitor_swipe') !== 'off';
 
     function setSwipeSetting(enabled) {
@@ -2543,10 +2697,11 @@
         touchStartTime = Date.now();
         ptr_startY = e.touches[0].clientY;
         swipeLocked = isInsideHorizontalScroll(e.target);
+        touchOnMap = !!e.target.closest('#reporting-map');
     }, { passive: true });
 
     document.addEventListener('touchend', function(e) {
-        if (!swipeEnabled || swipeLocked || window._modalOpen) return;
+        if (!swipeEnabled || swipeLocked || window._modalOpen || touchOnMap) return;
         const dx = e.changedTouches[0].clientX - touchStartX;
         const dy = e.changedTouches[0].clientY - touchStartY;
         const dt = Date.now() - touchStartTime;
@@ -2616,6 +2771,13 @@
         if (specificBtn) specificBtn.classList.toggle('active', savedComplexity === 'specific');
         const analyticsSection = document.getElementById('analytics-section');
         if (analyticsSection) analyticsSection.style.display = (savedComplexity === 'specific') ? 'block' : 'none';
+        const stationIntelBox = document.getElementById('station-intel-box');
+        if (stationIntelBox) stationIntelBox.style.display = (savedComplexity === 'specific') ? '' : 'none';
+        const savedSwipe = localStorage.getItem('skymonitor_swipe');
+        if (savedSwipe === 'off') {
+            document.getElementById('opt-swipe-on')?.classList.remove('active');
+            document.getElementById('opt-swipe-off')?.classList.add('active');
+        }
     });
 
     window.onload = function() {
