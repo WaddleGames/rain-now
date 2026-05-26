@@ -274,7 +274,7 @@
             </div>
         </div>
         <div class="settings-row">
-            <span class="settings-label">Enable Swiping</span>
+            <span class="settings-label">Page Swiping</span>
             <div class="btn-group">
                 <button id="opt-swipe-on" class="btn-opt active" onclick="setSwipeSetting(true)">ON</button>
                 <button id="opt-swipe-off" class="btn-opt" onclick="setSwipeSetting(false)">OFF</button>
@@ -314,7 +314,7 @@
         <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:10px;">
             <div>
                 <div style="text-align:left; font-weight:bold; color:var(--primary); display:flex; align-items:center; gap:8px;">
-                    MINUTELY
+                    MINUTELY FORECAST
                     <div id="precip24h" style="font-size:0.65em; background:rgba(255,213,79,0.2); color:white; padding:2px 6px; border-radius:4px; font-weight:normal; display:inline-block;">24h: --</div>
                 </div>
                 <div id="minuteSummary" style="text-align:left; font-size:1em; color:var(--accent);">--</div>
@@ -363,7 +363,7 @@
             </div>
             <div id="threat-factors" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"></div>
             <div style="font-size:0.52em; color:#444; margin-top:10px; border-top:1px solid rgba(255,255,255,0.05); padding-top:7px;">
-                Combines SPC outlook &middot; NWS alerts &middot; storm proximity &middot; wind &middot; pressure trend
+                Combines SPC outlook &middot; weather alerts &middot; storm proximity &middot; wind &middot; pressure trend
             </div>
         </div>
 
@@ -398,7 +398,7 @@
             </div>
 
             <div style="font-size:0.52em; color:#444; border-top:1px solid rgba(255,255,255,0.05); padding-top:7px; text-align:center; font-style:italic;">
-                Storm data: PirateWeather API &middot; Lightning risk estimated from proximity &amp; NWS alerts &mdash; not real-time strike data
+                Storm data powered by PirateWeather's API &middot; Lightning risk estimated from storm proximity &amp; weather alerts &mdash; not real-time strike data
             </div>
         </div>
 
@@ -444,13 +444,13 @@
             <div class="toolkit-box" style="margin-bottom:0; text-align:center; cursor:pointer;" onclick="openComfortModal()" title="Tap for hourly comfort">
                 <div class="toolkit-header" style="justify-content:center;"><span>COMFORT INDEX</span></div>
                 <div id="aqi-val" style="font-size:1.8em; font-weight:900; margin:10px 0;">--</div>
-                <div id="aqi-desc" style="font-size:0.75em; opacity:0.8;">Fetching...</div>
+                <div id="aqi-desc" style="font-size:0.75em; opacity:0.8;">Loading...</div>
                 <div style="font-size:0.6em; color:var(--primary); opacity:0.7; margin-top:4px;">TAP FOR HOURLY</div>
             </div>
             <div class="toolkit-box" style="margin-bottom:0; text-align:center; cursor:pointer;" onclick="openUVModal()" title="Tap for hourly UV">
                 <div class="toolkit-header" style="justify-content:center;"><span>UV INDEX</span></div>
                 <div id="uv-val" style="font-size:1.8em; font-weight:900; margin:10px 0;">--</div>
-                <div id="uv-desc" style="font-size:0.75em; opacity:0.8;">Fetching...</div>
+                <div id="uv-desc" style="font-size:0.75em; opacity:0.8;">Loading...</div>
                 <div style="font-size:0.6em; color:var(--primary); opacity:0.7; margin-top:4px;">TAP FOR HOURLY</div>
             </div>
         </div>
@@ -511,7 +511,7 @@
                 <canvas id="chart-wind" height="120" style="width:100%; display:block;"></canvas>
             </div>
             <div class="analytics-canvas-wrap">
-                <div class="analytics-label">&#127783; Precip Accum. Trend (in)</div>
+                <div class="analytics-label">&#127783; Precip. Accumulation Trend (in)</div>
                 <canvas id="chart-precip" height="120" style="width:100%; display:block;"></canvas>
             </div>
             <div style="font-size:0.6em; color:#444; text-align:center; margin-top:6px; font-style:italic;">Powered by PirateWeather &middot; Dewpoint computed from temperature &amp; humidity</div>
@@ -581,7 +581,7 @@
     const PIRATE_API_KEY = "p1eTDIbrnfGjCJlwMahUzarQNqzNPyxI";
     const OW_API_KEY = "065942b97acab61c4f876f77d1e71cfb";
     const TWC_API_KEY = "c51cf47ac5b04c389cf47ac5b0bc3857";
-    // v1.0.4: Update to your actual Cloudflare Worker URL
+    // CloudFlare worker URL for weather reporting (v1.0.4)
     const REPORTS_WORKER_URL = 'https://skymonitor-reports.skymonitor-account.workers.dev';
 
     let lat = 41.8781, lon = -87.6298;
@@ -1232,6 +1232,8 @@
                         highestTheme = 'theme-tor';
                         if (evt.includes('evacuation')) checklistText = 'EVACUATE IMMEDIATELY! FOLLOW LOCAL GUIDANCE!';
                         else if (evt.includes('fire warning')) checklistText = 'WILDFIRE IN YOUR AREA! FOLLOW LOCAL GUIDANCE!';
+                        else if (evt.includes('child abduction emergency')) checklistText = 'AMBER ALERT! FOLLOW LOCAL GUIDANCE!';
+                        else if (evt.includes('shelter in place warning')) checklistText = 'SHELTER IN PLACE NOW!';
                         else checklistText = 'CIVIL EMERGENCY! MONITOR LOCAL MEDIA FOR INSTRUCTIONS!';
                     } else if (evt.includes('tornado warning')) {
                         highestTheme = 'theme-tor';
@@ -1240,10 +1242,10 @@
                         else checklistText = 'TAKE COVER NOW!';
                     } else if (evt.includes('severe thunderstorm warning') && highestTheme !== 'theme-tor') {
                         highestTheme = 'theme-svr';
-                        checklistText = isPDS ? 'PDS SEVERE THUNDERSTORM! MOVE TO AN INTERIOR ROOM!' : 'MOVE TO AN INTERIOR ROOM!';
+                        checklistText = isPDS ? 'DESTRUCTIVE SEVERE THUNDERSTORM! TAKE SHELTER!' : 'MOVE TO AN INTERIOR ROOM!';
                     } else if (evt.includes('flash flood warning') && !highestTheme) {
                         highestTheme = 'theme-ffw';
-                        checklistText = isPDS ? 'FLASH FLOOD EMERGENCY! SEEK HIGHER GROUND NOW!' : 'SEEK HIGHER GROUND NOW!';
+                        checklistText = isPDS ? 'FLASH FLOOD EMERGENCY! SEEK HIGHER GROUND NOW!' : 'TURN AROUND, DON`T DROWN!';
                     } else if (evt.includes('dust storm warning') && !highestTheme) {
                         highestTheme = 'theme-svr'; checklistText = 'PULL ASIDE STAY ALIVE!';
                     }
@@ -1559,7 +1561,7 @@
             startSkyFX(condition);
             const radarMap = document.getElementById('radar-frame');
             if (radarMap) {
-                radarMap.src = 'https://www.rainviewer.com/map.html?loc=' + lat + ',' + lon + ',8&oFa=0&oC=1&oU=0&oCS=1&oF=0&oAP=1&rmt=4&c=3&o=83&lm=1&layer=radar&sm=1&sn=1&hu=false';
+                radarMap.src = 'https://www.rainviewer.com/map.html?loc=' + lat + ',' + lon + ',8&oFa=0&oC=1&oU=0&oCS=1&oF=0&oAP=0&rmt=4&c=3&o=83&lm=1&layer=radar&sm=1&sn=1&hu=false';
             }
         } catch(e) {}
     }
