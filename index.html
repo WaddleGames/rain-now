@@ -1050,7 +1050,7 @@
     }
 
     function applyInternationalMode() {
-        ['spc-outlook-section','wxstory-section','afd-section','hwo-section','wuStation'].forEach(function(id) {
+        ['spc-outlook-section','wxstory-section','afd-section','hwo-section'].forEach(function(id) {
             const el = document.getElementById(id); if (el) el.style.display = 'none';
         });
         document.getElementById('wfo-label').innerText = 'N/A (Outside US)';
