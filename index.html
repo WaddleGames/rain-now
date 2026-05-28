@@ -1045,6 +1045,21 @@
             }
             const expires = alert.expires ? new Date(alert.expires * 1000).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) : '';
             let desc = alert.description || '';
+            if (desc) {
+                const cacheKey = 'desc:' + desc.slice(0, 80);
+                if (window.alertTranslationCache[cacheKey]) {
+                    desc = window.alertTranslationCache[cacheKey];
+                } else {
+                    try {
+                        const tr2 = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=' + encodeURIComponent(desc));
+                        const td2 = await tr2.json();
+                        if (td2?.[0]) {
+                            const translated = td2[0].map(function(s) { return s?.[0] || ''; }).join('');
+                            if (translated) { window.alertTranslationCache[cacheKey] = translated; desc = translated; }
+                        }
+                    } catch(e) {}
+                }
+            }
             const isTruncated = desc.length > 140;
             const shortDesc = isTruncated ? desc.slice(0, 140) + '...' : desc;
             const pwId = 'pw-' + Date.now() + '-' + Math.floor(Math.random() * 9999);
