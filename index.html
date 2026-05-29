@@ -330,7 +330,7 @@
         </div>
 
         <div id="twc-section" style="margin-bottom:15px;">
-            <div style="font-weight:bold; color:var(--primary); margin-bottom:15px;">DAILY FORECAST <span style="font-size:0.6em; opacity:0.5; font-weight:normal;">&middot; Powered by TWC</span></div>
+            <div style="font-weight:bold; color:var(--primary); margin-bottom:15px;">DAILY FORECAST</div>
             <div id="twc-daily-forecast" class="forecast-scroll"></div>
         </div>
 
@@ -445,7 +445,7 @@
         <div id="wxstory-section">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <div style="font-weight:bold; color:var(--primary);">LOCAL WEATHER STORY</div>
-                <div style="display:flex; gap:5px;">
+                <div id="wxstory-controls" style="display:none; gap:5px;">
                     <button onclick="wxStoryPrev()" title="Previous" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9664;</button>
                     <button id="wxstory-playpause" onclick="wxStoryTogglePause()" title="Play/Pause" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9646;&#9646;</button>
                     <button onclick="wxStoryNext()" title="Next" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; padding:3px 10px; border-radius:6px; font-size:0.85em; cursor:pointer;">&#9654;</button>
@@ -487,7 +487,7 @@
                 <div class="analytics-label">&#127783; Precip. Accumulation Trend (in)</div>
                 <canvas id="chart-precip" height="120" style="width:100%; display:block;"></canvas>
             </div>
-            <div style="font-size:0.6em; color:#444; text-align:center; margin-top:6px; font-style:italic;">Powered by PirateWeather &middot; Dewpoint computed from temperature &amp; humidity</div>
+            <div style="font-size:0.6em; color:#444; text-align:center; margin-top:6px; font-style:italic;">Dewpoint computed from temperature &amp; humidity</div>
         </div>
     </div>
 
@@ -547,7 +547,8 @@
         <span style="margin:0 8px; opacity:0.3;">|</span>
         ALPHA RELEASE - v1.0.4
     </div>
-    <p style="font-size:0.75em; margin-top:10px; opacity:0.5;">Accurate weather, simplified.</p>
+    <p style="font-size:1em; margin-top:10px; opacity:0.6; font-weight:600; letter-spacing:0.5px;">Accurate weather, simplified.</p>
+    <p style="font-size:1em; margin-top:4px; opacity:0.5;">Powered by TWC, PirateWeather, OpenWeather, SPC, NWS, and WU</p>
 </footer>
 
 <script>
@@ -817,6 +818,8 @@
             window._wxStoryImages = validImages;
             window._wxStoryIndex = 0;
             window._wxPaused = false;
+            const ctrlsDiv = document.getElementById('wxstory-controls');
+            if (ctrlsDiv) ctrlsDiv.style.display = validImages.length > 1 ? 'flex' : 'none';
             const ppBtn = document.getElementById('wxstory-playpause');
             if (ppBtn) ppBtn.innerHTML = '&#9646;&#9646;';
             function showImage() {
@@ -1347,6 +1350,15 @@
         } catch(e) {}
     }
 
+    function fitComfortText(elem) {
+        const container = elem.parentElement;
+        if (!container) return;
+        const w = container.clientWidth || 200;
+        const len = (elem.textContent || '').length || 1;
+        const size = Math.max(14, Math.min(w * 0.22, w / (len + 1)));
+        elem.style.fontSize = Math.round(size) + 'px';
+    }
+
     function updateSmartComfort(T, feelsLike, H, W, cond, uv) {
         try {
             T = (T !== '--' && !isNaN(T)) ? Number(T) : 70;
@@ -1369,7 +1381,7 @@
             const valElem = document.getElementById('aqi-val'); const descElem = document.getElementById('aqi-desc');
             if (valElem) {
                 valElem.innerText = word; valElem.style.color = color;
-                valElem.style.fontSize = word.length <= 5 ? '1.5em' : word.length === 6 ? '1.2em' : word.length === 7 ? '1.0em' : '0.88em';
+                fitComfortText(valElem);
             }
             if (descElem) descElem.innerText = reason;
         } catch(e) {}
@@ -1619,7 +1631,7 @@
             const nwsCond = obs.properties.textDescription;
             const nwsIcon = obs.properties.icon;
             const PW_ICON_MAP = { 'clear-day':'https://api.weather.gov/icons/land/day/skc?size=medium','clear-night':'https://api.weather.gov/icons/land/night/skc?size=medium','rain':'https://api.weather.gov/icons/land/day/rain?size=medium','snow':'https://api.weather.gov/icons/land/day/snow?size=medium','sleet':'https://api.weather.gov/icons/land/day/sleet?size=medium','wind':'https://api.weather.gov/icons/land/day/wind_bkn?size=medium','fog':'https://api.weather.gov/icons/land/day/fog?size=medium','cloudy':'https://api.weather.gov/icons/land/day/ovc?size=medium','partly-cloudy-day':'https://api.weather.gov/icons/land/day/few?size=medium','partly-cloudy-night':'https://api.weather.gov/icons/land/night/few?size=medium','thunderstorm':'https://api.weather.gov/icons/land/day/tsra?size=medium' };
-            if (!nwsCond || nwsCond.trim() === '' || !nwsIcon) {
+            if (!nwsCond || nwsCond.trim() === '') {
                 // NWS observation blank — fall back to PirateWeather current conditions
                 const pw = window.pirateCurrently;
                 const fbCond = (pw && pw.summary) ? pw.summary : '--';
@@ -2069,7 +2081,7 @@
             ].filter(Boolean);
             html += '<div style="margin-top:13px; text-align:center;"><div style="font-size:1.15em;font-weight:bold; color:' + (part === 0 ? '#ffd54f' : '#bbb') + '">' + titles[part] + '</div><img src="https://www.wunderground.com/static/i/c/v4/' + (icons[part] ? icons[part] : '50') + '.svg" style="width:64px;height:64px;margin:0 auto;"><div style="font-size:1.5em; margin:0.25em 0; color:var(--accent);font-weight:bold;">' + (highs[part] !== undefined ? highs[part] + '\u00b0' : '--') + ' / ' + lohi[part] + '\u00b0</div><div style="font-size:1.05em; margin-bottom:9px;">' + (narratives[part] ?? '--') + '</div><div style="font-size:.9em;opacity:.85;"><strong>Precip Chance:</strong> ' + (precip[part] !== undefined ? precip[part] + '%' : '--') + ' &nbsp;&middot;&nbsp; <strong>Amount:</strong> ' + (qpf[part] !== undefined ? qpf[part] + '"' : '--') + '</div>' + (detailRows.length ? '<div style="font-size:0.82em;text-align:left;margin-top:10px;display:grid;grid-template-columns:auto 1fr;gap:5px 12px;background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;">' + detailRows.join('') + '</div>' : '') + '</div>';
         }
-        html += '<hr style="margin:14px 0;"><div style="margin:0;margin-top:-5px;font-weight:bold;">Hourly Forecast <span style="font-size:0.75em;opacity:0.5;font-weight:normal;">· Powered by PirateWeather</span></div><div id="twc-hourly-placeholder"><em>Loading...</em></div>';
+        html += '<hr style="margin:14px 0;"><div style="margin:0;margin-top:-5px;font-weight:bold;">Hourly Forecast</div><div id="twc-hourly-placeholder"><em>Loading...</em></div>';
         document.getElementById('twc-modal-inner').innerHTML = html;
 
         document.getElementById('twc-prev-btn').onclick = function(e) { e.stopPropagation(); openTWCDetailModal(data, (dayIdx - 1 + data.dayOfWeek.length) % data.dayOfWeek.length); };
@@ -2179,7 +2191,7 @@
                 const label = i === 0 ? 'Today' : new Date(key + 'T12:00:00Z').toLocaleDateString([], { weekday: 'short' });
                 return '<button id="comfort-tab-' + i + '" onclick="(function(idx){document.querySelectorAll(\'#comfort-day-tabs .btn-opt\').forEach(function(b){b.classList.remove(\'active\')});document.getElementById(\'comfort-tab-\'+idx).classList.add(\'active\');document.getElementById(\'comfort-hours\').innerHTML=window._comfortDayHtml[\'' + key + '\']; window._comfortDayIdx=idx;})(' + i + ')" class="btn-opt' + (key === activeKey ? ' active' : '') + '">' + label + '</button>';
             }).join('');
-            document.getElementById('comfort-modal-inner').innerHTML = '<button onclick="document.getElementById(\'comfort-modal\').style.display=\'none\'; setModalOpen(false);" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">HOURLY COMFORT INDEX</div><div id="comfort-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="comfort-hours">' + (window._comfortDayHtml[activeKey] || '') + '</div><div style="font-size:0.6em;opacity:0.4;text-align:center;margin-top:10px;">Powered by PirateWeather</div>';
+            document.getElementById('comfort-modal-inner').innerHTML = '<button onclick="document.getElementById(\'comfort-modal\').style.display=\'none\'; setModalOpen(false);" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">HOURLY COMFORT INDEX</div><div id="comfort-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="comfort-hours">' + (window._comfortDayHtml[activeKey] || '') + '</div>';
             // v1.0.4: Swipe between day tabs (attach once to avoid stacking)
             const inner = document.getElementById('comfort-modal-inner');
             if (!inner._swipeAttached) {
@@ -2247,7 +2259,7 @@
             const lbl = i === 0 ? 'Today' : new Date(key + 'T12:00:00Z').toLocaleDateString([], { weekday: 'short' });
             return '<button id="uv-tab-' + i + '" onclick="(function(idx){document.querySelectorAll(\'#uv-day-tabs .btn-opt\').forEach(function(b){b.classList.remove(\'active\')});document.getElementById(\'uv-tab-\'+idx).classList.add(\'active\');document.getElementById(\'uv-hours\').innerHTML=window._uvDayHtml[\'' + key + '\']; window._uvDayIdx=idx;})(' + i + ')" class="btn-opt' + (i === 0 ? ' active' : '') + '">' + lbl + '</button>';
         }).join('');
-        document.getElementById('uv-modal-inner').innerHTML = '<button onclick="document.getElementById(\'uv-modal\').style.display=\'none\'; setModalOpen(false);" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">\u2600\uFE0F HOURLY UV INDEX</div><div id="uv-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="uv-hours">' + (window._uvDayHtml[dayKeys[0]] || '') + '</div><div style="font-size:0.6em;opacity:0.4;text-align:center;margin-top:10px;">Powered by PirateWeather</div>';
+        document.getElementById('uv-modal-inner').innerHTML = '<button onclick="document.getElementById(\'uv-modal\').style.display=\'none\'; setModalOpen(false);" style="position:absolute;top:10px;right:15px;background:transparent;border:none;color:#fff;font-size:1.6em;cursor:pointer;">&times;</button><div style="font-size:1em;font-weight:bold;color:var(--primary);letter-spacing:1px;margin-bottom:12px;padding-right:28px;">\u2600\uFE0F HOURLY UV INDEX</div><div id="uv-day-tabs" class="btn-group spc-btn-tabs" style="margin-bottom:12px;">' + tabHtml + '</div><div id="uv-hours">' + (window._uvDayHtml[dayKeys[0]] || '') + '</div>';
         window._uvDayIdx = 0;
         // v1.0.4: Swipe between day tabs (attach once to avoid stacking)
         const inner = document.getElementById('uv-modal-inner');
@@ -2490,11 +2502,21 @@
         }, { enableHighAccuracy: true, timeout: 8000 });
     }
 
+    function applyPrivacyOffset(rawLat, rawLon) {
+        const offsetMeters = 150 + Math.random() * 100;
+        const angle = Math.random() * 2 * Math.PI;
+        const dLat = (offsetMeters * Math.cos(angle)) / 111000;
+        const dLon = (offsetMeters * Math.sin(angle)) / (111000 * Math.cos(rawLat * Math.PI / 180));
+        return { la: parseFloat((rawLat + dLat).toFixed(5)), lo: parseFloat((rawLon + dLon).toFixed(5)) };
+    }
+
     function initReportingMap() {
         if (reportingMap) {
-            reportingMap.setView([parseFloat(lat), parseFloat(lon)], reportingMap.getZoom());
-            if (reportPinMarker) reportPinMarker.setLatLng([parseFloat(lat), parseFloat(lon)]);
-            reportLat = parseFloat(lat); reportLon = parseFloat(lon);
+            const rawLat = parseFloat(lat), rawLon = parseFloat(lon);
+            const offset = applyPrivacyOffset(rawLat, rawLon);
+            reportingMap.setView([rawLat, rawLon], reportingMap.getZoom());
+            if (reportPinMarker) reportPinMarker.setLatLng([offset.la, offset.lo]);
+            reportLat = offset.la; reportLon = offset.lo;
             updatePinCoordsDisplay();
             reportingMap.invalidateSize();
             return;
@@ -2502,10 +2524,12 @@
         const L_ref = window.L;
         if (!L_ref) { setTimeout(initReportingMap, 500); return; }
 
-        reportLat = parseFloat(lat); reportLon = parseFloat(lon);
+        const rawLat = parseFloat(lat), rawLon = parseFloat(lon);
+        const offset = applyPrivacyOffset(rawLat, rawLon);
+        reportLat = offset.la; reportLon = offset.lo;
         updatePinCoordsDisplay();
 
-        reportingMap = L_ref.map('reporting-map', { zoomControl: true }).setView([parseFloat(lat), parseFloat(lon)], 8);
+        reportingMap = L_ref.map('reporting-map', { zoomControl: true }).setView([rawLat, rawLon], 8);
 
         L_ref.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a>', maxZoom: 18, opacity: 0.55
@@ -2542,7 +2566,7 @@
         const instrEl = document.getElementById('report-pin-instruction');
         if (instrEl) instrEl.innerText = '\uD83D\uDCCC Double-click map to pin location';
 
-        reportPinMarker = L_ref.marker([parseFloat(lat), parseFloat(lon)], { icon: dotIcon, draggable: true, zIndexOffset: 1000 })
+        reportPinMarker = L_ref.marker([reportLat, reportLon], { icon: dotIcon, draggable: true, zIndexOffset: 1000 })
             .bindTooltip('Report location', { permanent: false })
             .addTo(reportingMap);
         reportPinMarker.on('dragend', function(e) {
@@ -2552,7 +2576,6 @@
             updatePinCoordsDisplay();
         });
 
-        reportLat = parseFloat(lat); reportLon = parseFloat(lon);
         updatePinCoordsDisplay();
 
         // Double-click/double-tap to move pin — manual timer is more reliable than native dblclick on mobile
