@@ -1623,8 +1623,8 @@
                 const fbIcon = (pw && pw.icon) ? PW_ICON_MAP[pw.icon] : null;
                 currentCondition = fbCond;
                 document.getElementById('conditionText').innerText = fbCond;
-                document.getElementById('stationName').innerText = 'PIRATEWEATHER (NWS OBS UNAVAILABLE)';
-                document.getElementById('meta-name').innerText = 'PirateWeather (NWS obs unavailable)';
+                document.getElementById('stationName').innerText = 'PIRATEWEATHER';
+                document.getElementById('meta-name').innerText = 'PirateWeather';
                 if (fbIcon) { document.getElementById('weatherIcon').src = fbIcon; document.getElementById('weatherIcon').style.display = 'block'; }
                 else document.getElementById('weatherIcon').style.display = 'none';
             } else {
@@ -2706,7 +2706,8 @@
         const sync = document.getElementById('sync-indicator');
         if (sync) sync.style.opacity = '1';
         try {
-            await Promise.all([fetchPirate(), fetchNWSChain(), fetchOpenWeather(), fetchTWCForecast()]);
+            await fetchPirate();
+            await Promise.all([fetchNWSChain(), fetchOpenWeather(), fetchTWCForecast()]);
             await fetchAlerts();
             await fetchRiskLevels();
             updateSPCMap(activeSPCDay);
