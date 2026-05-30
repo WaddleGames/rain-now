@@ -28,7 +28,7 @@ self.addEventListener('push', (e) => {
 });
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) ? e.notification.data.url : '/';
+  const url = (e.notification.data && e.notification.data.url) ? e.notification.data.url : '/sky-monitor/';
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
