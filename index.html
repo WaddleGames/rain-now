@@ -1344,6 +1344,10 @@
                     const isLocalEmergency = EMERGENCY_TYPES.some(function(em) { return evt.includes(em); });
                     let icon = 'https://www.weather.gov/bundles/templating/images/top_news/important.png';
                     for (const key in ALERT_ICONS) { if (evt.includes(key)) { icon = ALERT_ICONS[key]; break; } }
+                    // At night, prepend 'n' to the filename (e.g. tsra.png → ntsra.png).
+                    // onerror on the <img> falls back to the day URL if the night variant 404s.
+                    const dayIcon = icon;
+                    if (isNightAtStation) icon = icon.replace(/([^/]+\.png)(\?.*)?$/, 'n$1$2');
 
                     if (isLocalEmergency) {
                         highestTheme = 'theme-tor';
@@ -1387,7 +1391,7 @@
                     const nwsId = 'nws-' + Date.now() + '-' + Math.floor(Math.random() * 9999);
 
                     // v1.0.4: button BEFORE the full-text div
-                    stack.innerHTML += '<a href="https://forecast.weather.gov/MapClick.php?lat=' + lat + '&lon=' + lon + '" target="_blank" class="alert-card" style="background:' + bgColor + '; align-items:flex-start;"><img src="' + icon + '" style="width:55px; border-radius:5px; margin-top:2px; flex-shrink:0;"><div style="flex:1; min-width:0;"><b>' + displayName + '</b><br><small>' + (p.headline || '') + '</small>' + (extraDetails ? '<div style="font-size:0.75em; opacity:0.85; margin-top:4px;">' + extraDetails + '</div>' : '') + (fullContent ? '<button class="alert-expand-btn" id="btn-' + nwsId + '" onclick="event.stopPropagation(); event.preventDefault(); toggleAlertText(\'' + nwsId + '\')">\u25bc Show more</button><div id="full-' + nwsId + '" class="alert-full-text">' + fullContent + '</div>' : '') + '</div></a>';
+                    stack.innerHTML += '<a href="https://forecast.weather.gov/MapClick.php?lat=' + lat + '&lon=' + lon + '" target="_blank" class="alert-card" style="background:' + bgColor + '; align-items:flex-start;"><img src="' + icon + '"' + (isNightAtStation ? ' onerror="this.onerror=null;this.src=\'' + dayIcon + '\'"' : '') + ' style="width:55px; border-radius:5px; margin-top:2px; flex-shrink:0;"><div style="flex:1; min-width:0;"><b>' + displayName + '</b><br><small>' + (p.headline || '') + '</small>' + (extraDetails ? '<div style="font-size:0.75em; opacity:0.85; margin-top:4px;">' + extraDetails + '</div>' : '') + (fullContent ? '<button class="alert-expand-btn" id="btn-' + nwsId + '" onclick="event.stopPropagation(); event.preventDefault(); toggleAlertText(\'' + nwsId + '\')">\u25bc Show more</button><div id="full-' + nwsId + '" class="alert-full-text">' + fullContent + '</div>' : '') + '</div></a>';
                 });
 
                 if (highestTheme) document.body.className = highestTheme;
