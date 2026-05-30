@@ -414,7 +414,7 @@
             </div>
             <div style="display:flex; align-items:center; gap:15px;">
                 <div id="threat-badge" style="font-size:2em; font-weight:900; letter-spacing:-1px; color:var(--success);">&#128994; LOW</div>
-                <div style="flex:1;">
+                <div style="flex:1; min-width:0;">
                     <div id="threat-desc" style="font-size:0.8em; color:#aaa; line-height:1.5;">No significant hazards at this time.</div>
                 </div>
             </div>
@@ -1206,7 +1206,10 @@
         if (currentHour < 6 || currentHour >= 18) { if (boxEl) boxEl.style.display = 'none'; return; }
         const now = Math.floor(Date.now() / 1000);
         const todayHours = hourlyData.filter(function(h) {
+            // BEFORE:
             return h.time >= now && h.time <= now + 12 * 3600;
+            // AFTER:
+            return h.time + 3600 > now && h.time <= now + 12 * 3600;
         }).slice(0, 12);
         if (!todayHours.length || !boxEl) return;
         function scoreHour(h) {
@@ -1288,7 +1291,7 @@
         const maxGust = Math.max(...todayHours.map(function(h) { return h.windGust || h.windSpeed || 0; }));
         const maxFeels = Math.max(...todayHours.map(function(h) { return h.apparentTemperature || h.temperature || 70; }));
         const minFeels = Math.min(...todayHours.map(function(h) { return h.apparentTemperature || h.temperature || 70; }));
-        // Find earliest rainy hour
+        // BEFORE:
         var rainWindow = '';
         var rainHour = todayHours.find(function(h) { return (h.precipProbability || 0) >= 0.5; });
         if (rainHour) {
@@ -1296,6 +1299,19 @@
             var ampm = rh >= 12 ? 'PM' : 'AM';
             var rh12 = rh > 12 ? rh - 12 : (rh === 0 ? 12 : rh);
             rainWindow = rh12 + ' ' + ampm;
+        }
+        // AFTER:
+        var rainWindow = '';
+        var rainHour = todayHours.find(function(h) { return (h.precipProbability || 0) >= 0.5; });
+        if (rainHour) {
+            if (rainHour.time <= now) {
+                rainWindow = 'now';
+            } else {
+                var rh = new Date(rainHour.time * 1000).getHours();
+                var ampm = rh >= 12 ? 'PM' : 'AM';
+                var rh12 = rh > 12 ? rh - 12 : (rh === 0 ? 12 : rh);
+                rainWindow = rh12 + ' ' + ampm;
+            }
         }
         let desc;
         if (avgScore >= 90) {
@@ -1809,31 +1825,49 @@
             } catch(e) { document.getElementById('hwo-section').style.display = 'none'; }
             const stations = await (await fetch(p.properties.observationStations)).json();
             const primaryStation = stations.features[0];
-            const obs = await (await fetch(primaryStation.id + '/observations/latest')).json();
+            const elevMeters = primaryStation.properties.elevation?.value;
             document.getElementById('stationName').innerText = primaryStation.properties.name;
             document.getElementById('meta-name').innerText = primaryStation.properties.name;
             document.getElementById('meta-id').innerText = primaryStation.properties.stationIdentifier;
-            const elevMeters = primaryStation.properties.elevation.value;
             document.getElementById('meta-elev').innerText = elevMeters ? Math.round(elevMeters * 3.28084) + ' ft' : 'N/A';
-            const nwsCond = obs.properties.textDescription;
-            const nwsIcon = obs.properties.icon;
             const PW_ICON_MAP = { 'clear-day':'https://api.weather.gov/icons/land/day/skc?size=medium','clear-night':'https://api.weather.gov/icons/land/night/skc?size=medium','rain':'https://api.weather.gov/icons/land/day/rain?size=medium','snow':'https://api.weather.gov/icons/land/day/snow?size=medium','sleet':'https://api.weather.gov/icons/land/day/sleet?size=medium','wind':'https://api.weather.gov/icons/land/day/wind_bkn?size=medium','fog':'https://api.weather.gov/icons/land/day/fog?size=medium','cloudy':'https://api.weather.gov/icons/land/day/ovc?size=medium','partly-cloudy-day':'https://api.weather.gov/icons/land/day/few?size=medium','partly-cloudy-night':'https://api.weather.gov/icons/land/night/few?size=medium','thunderstorm':'https://api.weather.gov/icons/land/day/tsra?size=medium' };
-            if (!nwsCond || nwsCond.trim() === '') {
-                // NWS observation blank — fall back to PirateWeather current conditions
+            const PW_ICON_TO_TEXT = { 'clear-day':'Clear','clear-night':'Clear','rain':'Rain','snow':'Snow','sleet':'Sleet','wind':'Windy','fog':'Fog','cloudy':'Cloudy','partly-cloudy-day':'Partly Cloudy','partly-cloudy-night':'Partly Cloudy','thunderstorm':'Thunderstorm' };
+            let nwsCond = '';
+            let nwsIcon = null;
+            try {
+                const obsRes = await fetch(primaryStation.id + '/observations/latest');
+                const obs = obsRes.ok ? await obsRes.json() : null;
+                const op = obs?.properties || {};
+                nwsCond = (op.textDescription || '').trim();
+                // ASOS automated stations often have null textDescription but populate
+                // the weather[] array instead — try to derive a readable string from it
+                if (!nwsCond && Array.isArray(op.weather)) {
+                    const wx = op.weather.filter(function(w) { return w && w.weather; }).map(function(w) { return w.weather; });
+                    if (wx.length) nwsCond = wx.join(', ');
+                }
+                nwsIcon = op.icon || null;
+            } catch(obsErr) { /* observation fetch failed — will fall back below */ }
+            if (!nwsCond) {
+                // Truly no NWS conditions — fall back to PirateWeather
                 const pw = window.pirateCurrently;
-                const fbCond = (pw && pw.summary) ? pw.summary : '--';
-                const fbIcon = (pw && pw.icon) ? PW_ICON_MAP[pw.icon] : null;
-                currentCondition = fbCond;
-                document.getElementById('conditionText').innerText = fbCond;
-                document.getElementById('stationName').innerText = 'PIRATEWEATHER OBSERVATION';
-                document.getElementById('meta-name').innerText = 'PirateWeather API';
-                if (fbIcon) { document.getElementById('weatherIcon').src = fbIcon; document.getElementById('weatherIcon').style.display = 'block'; }
-                else document.getElementById('weatherIcon').style.display = 'none';
+                const fbCond = (pw && pw.summary) ? pw.summary
+                             : (pw && pw.icon && PW_ICON_TO_TEXT[pw.icon]) ? PW_ICON_TO_TEXT[pw.icon]
+                             : null;
+                if (fbCond) {
+                    currentCondition = fbCond;
+                    document.getElementById('conditionText').innerText = fbCond;
+                    document.getElementById('stationName').innerText = 'PIRATEWEATHER OBSERVATION';
+                    document.getElementById('meta-name').innerText = 'PirateWeather API';
+                    const fbIcon = pw.icon ? PW_ICON_MAP[pw.icon] : null;
+                    if (fbIcon) { document.getElementById('weatherIcon').src = fbIcon; document.getElementById('weatherIcon').style.display = 'block'; }
+                    else document.getElementById('weatherIcon').style.display = 'none';
+                }
+                // else: genuine dead-end — stationName stays, conditionText stays '--'
             } else {
                 currentCondition = nwsCond;
                 document.getElementById('conditionText').innerText = nwsCond;
-                document.getElementById('weatherIcon').src = nwsIcon;
-                document.getElementById('weatherIcon').style.display = 'block';
+                if (nwsIcon) { document.getElementById('weatherIcon').src = nwsIcon; document.getElementById('weatherIcon').style.display = 'block'; }
+                else document.getElementById('weatherIcon').style.display = 'none';
             }
             try {
                 const afdList = await (await fetch('https://api.weather.gov/products/types/AFD/locations/' + wfo)).json();
