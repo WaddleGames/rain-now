@@ -244,7 +244,7 @@
     <span id="sync-indicator">&#9679; UPDATING</span>
 
     <h1>
-        <span>SkyMonitor <span style="font-size:0.4em; color:#888; font-weight:normal;">v1.0.5</span></span>
+        <span>SkyMonitor <span style="font-size:0.4em; color:#888; font-weight:normal;">v1.0.4</span></span>
     </h1>
 
     <div style="display: flex; align-items: flex-start; gap: 10px; max-width: 100%; overflow: hidden;">
@@ -282,6 +282,10 @@
                 <button id="opt-swipe-on" class="btn-opt active" onclick="setSwipeSetting(true)">ON</button>
                 <button id="opt-swipe-off" class="btn-opt" onclick="setSwipeSetting(false)">OFF</button>
             </div>
+        </div>
+        <div class="settings-row" id="notif-settings-row" style="display:none;">
+            <span class="settings-label">Alert Notifications</span>
+            <button id="notif-toggle-btn" onclick="togglePushNotifications()" style="width:100%; padding:10px; border:none; border-radius:8px; font-size:0.75em; font-weight:900; cursor:pointer; letter-spacing:1px; transition:0.2s; background:rgba(255,255,255,0.08); color:white;">&#128276; Enable Notifications</button>
         </div>
         <div style="margin-top:20px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.06); text-align:center; font-size:0.65em; color:#445566;">
             Created by <a href="https://youtube.com/@chicagoareaEAS" target="_blank" style="color:#556677; text-decoration:none;">@chicagoareaEAS</a> on YouTube
@@ -547,7 +551,7 @@
     <div style="margin-bottom:8px;">
         <span style="letter-spacing:2px; font-weight:800; color:#aaa;">SkyMonitor</span>
         <span style="margin:0 8px; opacity:0.3;">|</span>
-        ALPHA RELEASE - v1.0.5
+        ALPHA RELEASE - v1.0.4
     </div>
     <p style="font-size:0.85em; margin-top:10px; opacity:0.6; font-weight:600; letter-spacing:0.5px;">Accurate weather, simplified.</p>
     <p style="font-size:0.65em; margin-top:4px; opacity:0.5;">Powered by TWC, PirateWeather, OpenWeather, SPC, NWS, and WU</p>
@@ -2970,13 +2974,91 @@
         if (currentTabIdx < 0) currentTabIdx = 0;
     };
 
-    // ——— PWA SERVICE WORKER (v1.0.4) ———
+    // ——— PUSH NOTIFICATIONS BACKEND URL ———
+    // If your HTML is on GitHub Pages, set this to your deployed Replit URL:
+    // var SKYMONITOR_API = 'https://your-app-name.replit.app';
+    // If your HTML is served from the same server as the API, leave it as '':
+    var SKYMONITOR_API = '';
+
+    // ——— PWA SERVICE WORKER + PUSH NOTIFICATIONS (v1.1.0) ———
+    var _swReg = null;
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-            const swCode = "const CACHE='skymonitor-v1.0.4';self.addEventListener('install',e=>{self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))))});self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;if(!e.request.url.startsWith(self.location.origin))return;e.respondWith(fetch(e.request).catch(()=>caches.match(e.request)))});";
-            const blob = new Blob([swCode], { type: 'application/javascript' });
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl).catch(function() {});
+            navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                _swReg = reg;
+                if ('PushManager' in window) {
+                    var row = document.getElementById('notif-settings-row');
+                    if (row) row.style.display = 'block';
+                    setTimeout(checkNotifStatus, 1500);
+                }
+            }).catch(function() {});
+        });
+    }
+
+    function _urlB64ToUint8(base64String) {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var raw = atob(base64);
+        var arr = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+
+    function checkNotifStatus() {
+        if (!_swReg || !('PushManager' in window)) return;
+        _swReg.pushManager.getSubscription().then(function(sub) {
+            _setNotifBtnState(!!sub);
+        }).catch(function() {});
+    }
+
+    function _setNotifBtnState(enabled) {
+        var btn = document.getElementById('notif-toggle-btn');
+        if (!btn) return;
+        btn.textContent = enabled ? '\uD83D\uDD14 Notifications: ON' : '\uD83D\uDD15 Enable Notifications';
+        btn.style.background = enabled ? 'var(--success)' : 'rgba(255,255,255,0.08)';
+        btn.style.color = enabled ? '#000' : 'white';
+    }
+
+    function togglePushNotifications() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            alert('Push notifications are not supported in this browser.'); return;
+        }
+        var isStandalone = (window.navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
+        if (!isStandalone) {
+            alert('To receive alerts, add SkyMonitor to your Home Screen first, then reopen the app and try again.'); return;
+        }
+        if (!_swReg) { alert('Service worker not ready. Please wait a moment and try again.'); return; }
+
+        _swReg.pushManager.getSubscription().then(function(existing) {
+            if (existing) {
+                existing.unsubscribe().then(function() {
+                    return fetch(SKYMONITOR_API + '/api/push/unsubscribe', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ endpoint: existing.endpoint }) });
+                }).then(function() {
+                    _setNotifBtnState(false);
+                }).catch(function(e) { alert('Failed to disable notifications: ' + e.message); });
+            } else {
+                fetch(SKYMONITOR_API + '/api/push/vapid-public-key').then(function(r) {
+                    if (!r.ok) { alert('Push notifications are not configured on the server.'); return null; }
+                    return r.json();
+                }).then(function(data) {
+                    if (!data) return;
+                    return Notification.requestPermission().then(function(perm) {
+                        if (perm !== 'granted') { alert('Notification permission denied.'); return; }
+                        return _swReg.pushManager.subscribe({
+                            userVisibleOnly: true,
+                            applicationServerKey: _urlB64ToUint8(data.publicKey)
+                        });
+                    });
+                }).then(function(sub) {
+                    if (!sub) return;
+                    return fetch(SKYMONITOR_API + '/api/push/subscribe', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ subscription: sub.toJSON(), lat: lat, lon: lon })
+                    }).then(function() { _setNotifBtnState(true); });
+                }).catch(function(e) { alert('Failed to enable notifications: ' + (e.message || e)); });
+            }
         });
     }
 
@@ -3010,7 +3092,19 @@
 
     window.onload = function() {
         loadLoc();
-        loadAll();
+        loadAll().then(function() {
+            if (_swReg) {
+                _swReg.pushManager.getSubscription().then(function(sub) {
+                    if (sub && lat && lon) {
+                        fetch(SKYMONITOR_API + '/api/push/subscribe', {
+                            method: 'POST',
+                            headers: {'Content-Type':'application/json'},
+                            body: JSON.stringify({ subscription: sub.toJSON(), lat: lat, lon: lon })
+                        }).catch(function() {});
+                    }
+                }).catch(function() {});
+            }
+        });
     };
 </script>
 </body>
