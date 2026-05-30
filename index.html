@@ -295,7 +295,7 @@
             <span class="settings-label">Alert Notifications</span>
             <div style="display:flex; gap:6px; align-items:center;">
                 <button id="notif-toggle-btn" onclick="togglePushNotifications()" style="flex:1; padding:10px; border:none; border-radius:8px; font-size:0.75em; font-weight:900; cursor:pointer; letter-spacing:1px; transition:0.2s; background:rgba(255,255,255,0.08); color:white;">&#128276; Enable Notifications</button>
-                <button onclick="openNotifPrefs()" title="Notification Settings" style="padding:10px 13px; border:none; border-radius:8px; font-size:1em; cursor:pointer; background:rgba(255,255,255,0.08); color:white;">&#9881;&#65039;</button>
+                <button id="notif-prefs-btn" onclick="openNotifPrefs()" title="Notification Settings" style="display:none; padding:10px 13px; border:none; border-radius:8px; font-size:1em; cursor:pointer; background:rgba(255,255,255,0.08); color:white;">&#9881;&#65039;</button>
             </div>
             <button id="notif-test-btn" onclick="sendTestNotification()" style="display:none; width:100%; margin-top:6px; padding:10px; border:1px solid rgba(255,255,255,0.15); border-radius:8px; font-size:0.7em; font-weight:700; cursor:pointer; letter-spacing:1px; background:rgba(255,255,255,0.08); color:white;">&#129514; Send Test Notification</button>
         </div>
@@ -304,7 +304,7 @@
         </div>
     </div>
 
-    <div id="notif-prefs-modal" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
+    <div id="notif-prefs-modal" onclick="if(event.target===this)closeNotifPrefs()" style="display:none; position:fixed; inset:0; z-index:2000; background:rgba(0,0,0,0.75); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
     <div style="background:#0f1e2d; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:24px; width:90%; max-width:340px; box-shadow:0 20px 60px rgba(0,0,0,0.8);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
             <span style="font-weight:800; font-size:0.95em; letter-spacing:1px; color:white;">&#128276; NOTIFICATION SETTINGS</span>
@@ -3126,6 +3126,10 @@
         btn.textContent = enabled ? '\uD83D\uDD14 Notifications: ON' : '\uD83D\uDD15 Enable Notifications';
         btn.style.background = enabled ? 'var(--success)' : 'rgba(255,255,255,0.08)';
         btn.style.color = enabled ? '#000' : 'white';
+        var testBtn = document.getElementById('notif-test-btn');
+        if (testBtn) testBtn.style.display = enabled ? 'block' : 'none';
+        var prefsBtn = document.getElementById('notif-prefs-btn');
+        if (prefsBtn) prefsBtn.style.display = enabled ? 'inline-block' : 'none';
     }
     
     function togglePushNotifications() {
