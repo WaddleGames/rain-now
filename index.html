@@ -656,6 +656,16 @@
     window.activeAlertEvents = [];
     window.activeSVRDestructive = false;
     window.activeTornadoObserved = false;
+    // v1.0.6: Extended threat intelligence
+    window.stormApproaching = false;
+    window.liveTemp = null;
+    window.alertMaxHailIn = 0;
+    window.alertMaxWindGustMph = 0;
+    window.alertHasTornadoPossible = false;
+    window.alertHasConsiderableHail = false;
+    window.alertHasConsiderableWind = false;
+    window.alertHasCatastrophicFlood = false;
+    window.alertHasObservedCertainty = false;
     // v1.0.4: Modal-open flag disables tab swipe
     window._modalOpen = false;
     function setModalOpen(v) { window._modalOpen = v; document.body.style.overflow = v ? 'hidden' : ''; }
@@ -1374,6 +1384,13 @@
         window.activeAlertEvents = [];
         window.activeSVRDestructive = false;
         window.activeTornadoObserved = false;
+        window.alertMaxHailIn = 0;
+        window.alertMaxWindGustMph = 0;
+        window.alertHasTornadoPossible = false;
+        window.alertHasConsiderableHail = false;
+        window.alertHasConsiderableWind = false;
+        window.alertHasCatastrophicFlood = false;
+        window.alertHasObservedCertainty = false;
 
         if (window.isOutsideUS) {
             stack.innerHTML = ''; checklist.style.display = 'none'; banner.style.display = 'none'; banner.className = '';
@@ -1479,6 +1496,30 @@
                         const dmgThreat = (p.parameters && p.parameters.thunderstormDamageThreat && p.parameters.thunderstormDamageThreat[0]) || '';
                         if (dmgThreat.includes('DESTRUCTIVE')) window.activeSVRDestructive = true;
                     } else if (evt.includes('warning')) window.activeStormWarning = true;
+
+                    // v1.0.6: Extract extended sub-parameters for threat intelligence
+                    const ap = p.parameters || {};
+                    if (p.certainty === 'Observed') window.alertHasObservedCertainty = true;
+                    // Hail
+                    const hailSizeRaw = ap.maxHailSize && ap.maxHailSize[0];
+                    if (hailSizeRaw) { const hi = parseFloat(hailSizeRaw); if (!isNaN(hi) && hi > window.alertMaxHailIn) window.alertMaxHailIn = hi; }
+                    const hailThr = (ap.hailThreat && ap.hailThreat[0]) || '';
+                    if (hailThr.toUpperCase().includes('CONSIDERABLE') || hailThr.toUpperCase().includes('DESTRUCTIVE')) window.alertHasConsiderableHail = true;
+                    // Wind gust
+                    const gustRaw = ap.maxWindGust && ap.maxWindGust[0];
+                    if (gustRaw) { const gi = parseInt(gustRaw); if (!isNaN(gi) && gi > window.alertMaxWindGustMph) window.alertMaxWindGustMph = gi; }
+                    const windThr = (ap.windThreat && ap.windThreat[0]) || '';
+                    if (windThr.toUpperCase().includes('CONSIDERABLE') || windThr.toUpperCase().includes('DESTRUCTIVE')) window.alertHasConsiderableWind = true;
+                    // Tornado possible inside SVR
+                    if (evt.includes('severe thunderstorm warning')) {
+                        const torPoss = (ap.tornadoPossible && ap.tornadoPossible[0]) || '';
+                        if (torPoss.toUpperCase() === 'YES' || desc.includes('TORNADO POSSIBLE') || desc.includes('TORNADO THREAT')) window.alertHasTornadoPossible = true;
+                    }
+                    // Flash flood catastrophic designation
+                    if (evt.includes('flash flood')) {
+                        const floodSev = (ap.floodSeverityCategory && ap.floodSeverityCategory[0]) || '';
+                        if (floodSev.toUpperCase().includes('CATASTROPHIC') || desc.includes('CATASTROPHIC FLOOD')) window.alertHasCatastrophicFlood = true;
+                    }
 
                     const isTorEmergency = desc.includes('TORNADO EMERGENCY');
                     const isPDS = desc.includes('PARTICULARLY DANGEROUS SITUATION') || desc.includes('FLASH FLOOD EMERGENCY');
@@ -1637,6 +1678,7 @@
             if (daySummary) document.getElementById('vibeCheck').innerText = daySummary;
             let temp = (useWU && wu.temp !== null) ? wu.temp : curr.temperature;
             if (useWU && Math.abs(wu.temp - curr.temperature) > 5) temp = curr.temperature;
+            window.liveTemp = Math.round(temp);
             document.getElementById('tempVal').innerText = Math.round(temp) + '\u00b0';
             liveFeelsLike = curr.apparentTemperature; liveUV = curr.uvIndex || 0;
             const windSpeed = (useWU && wu.windSpeed !== null) ? wu.windSpeed : curr.windSpeed;
@@ -1697,7 +1739,7 @@
                     const deltaTotal = sh[0].nearestStormDistance - sh[sh.length - 1].nearestStormDistance;
                     const hoursSpan = sh.length - 1;
                     stormSpeedEst = Math.max(10, Math.abs(deltaTotal / hoursSpan));
-                    if (deltaTotal > 3) stormTrend = 'approaching';
+                    if (deltaTotal > 3) { stormTrend = 'approaching'; window.stormApproaching = true; }
                     else if (deltaTotal < -3) stormTrend = 'moving away';
                 }
             }
@@ -2066,18 +2108,57 @@
         if (document.getElementById('severe-tab').classList.contains('active')) updateLightningEstimate();
     }, 30000);
 
-    // ——— v1.0.5: THREAT LEVEL — full per-alert-type scoring ———
+    // ——— v1.0.6: THREAT LEVEL — genuinely intelligent multi-layer scoring ———
+
+    // Context-aware description builder
+    function buildThreatDescription(tier, hazardCats, flags) {
+        // Tornado sub-types
+        if (flags.torEmergency) return 'A TORNADO EMERGENCY is in progress — an extremely rare, catastrophic situation. Take cover in the lowest interior room immediately.';
+        if (flags.pdsTor) return 'A Particularly Dangerous Situation (PDS) Tornado Warning is in effect. This is a rare, life-threatening event. Take cover now.';
+        if (flags.ffe) return 'A Flash Flood Emergency is occurring. Life-threatening flooding is imminent or ongoing. Seek higher ground immediately — do not wait.';
+        if (flags.torObserved) {
+            if (flags.night) return 'A confirmed tornado is on the ground nearby at night — extremely dangerous. Take shelter immediately in an interior room.';
+            return 'A confirmed tornado is on the ground near your location. Take immediate shelter in an interior, lowest-level room.';
+        }
+        if (flags.torWarning) {
+            if (flags.night) return 'A tornado warning is in effect. Nighttime tornadoes are especially deadly — take cover now even without visible warning signs.';
+            return 'A tornado warning is in effect near you. Move immediately to an interior room on the lowest floor of a sturdy building.';
+        }
+        // Multi-hazard
+        const cats = Object.keys(hazardCats);
+        if (cats.length >= 3) return 'Multiple simultaneous hazards are active: ' + cats.join(', ') + '. This is a complex weather emergency — follow all active NWS guidance.';
+        // Single-dominant hazard
+        if (hazardCats.tropical) return 'Tropical weather hazards are active. Hurricane-force conditions may include devastating winds, surge, and flooding. Follow evacuation orders.';
+        if (hazardCats.convective && tier === 'DANGEROUS') return 'Severe convective weather is active near you, with potential for large hail, damaging winds, or brief tornadoes. Take shelter now.';
+        if (hazardCats.convective) return 'Thunderstorm watches or hazards are in effect. Be prepared to shelter quickly if conditions deteriorate.';
+        if (hazardCats.flood && flags.heavyRain) return 'Active flooding combined with heavy rainfall creates an extremely dangerous situation. Avoid all low-lying areas and roadways.';
+        if (hazardCats.flood) return 'Flooding is occurring or imminent in the area. Avoid flooded roads — turn around, don\'t drown.';
+        if (hazardCats.winter && tier === 'DANGEROUS') return 'Extreme winter conditions are occurring. Blizzard or ice storm conditions may cause dangerous travel and power outages.';
+        if (hazardCats.winter) return 'Winter weather alerts are in effect. Expect hazardous travel and reduced visibility from snow, ice, or freezing rain.';
+        if (hazardCats.wind && tier === 'DANGEROUS') return 'Dangerous wind conditions are active. Secure loose objects, avoid travel, and stay away from trees and power lines.';
+        if (hazardCats.wind) return 'Elevated wind hazards are in the area. Gusty winds may cause localized damage and difficult driving conditions.';
+        if (hazardCats.heat) return 'Extreme heat conditions are dangerous. Limit outdoor exposure, stay hydrated, and check on vulnerable individuals.';
+        if (hazardCats.fire) return 'Critical fire weather conditions exist. Extreme fire behavior is possible — follow evacuation orders and air quality guidance.';
+        // Tier fallbacks
+        if (tier === 'LIFE THREATENING') return 'A life-threatening weather situation is ongoing. Take immediate protective action and follow all NWS instructions.';
+        if (tier === 'DANGEROUS') return 'Hazardous conditions are active near you. Remain sheltered and closely monitor NWS alerts for updates.';
+        if (tier === 'ACTIVE WEATHER') return 'Active weather alerts are in effect for your area. Stay weather-aware and be ready to act if conditions worsen.';
+        if (tier === 'ELEVATED') return 'Weather concerns are present today. Monitor forecasts and have a plan ready in case conditions deteriorate.';
+        return 'No significant weather hazards detected. Conditions are currently calm.';
+    }
+
     function computeThreatLevel() {
         const box = document.getElementById('threat-level-box');
         const badge = document.getElementById('threat-badge');
-        const desc = document.getElementById('threat-desc');
+        const descEl = document.getElementById('threat-desc');
         const factors = document.getElementById('threat-factors');
         const updated = document.getElementById('threat-updated');
         if (!box) return;
         let score = 0;
         const factorList = [];
+        const hazardCats = {}; // tracks distinct hazard categories active
 
-        // ── 1. SPC convective outlook ──────────────────────────────────────
+        // ── 1. SPC Convective Outlook ──────────────────────────────────────
         const spc = window.spcRisk;
         const SPC_SCORES = { TSTM: 0, MRGL: 1, SLGT: 2, ENH: 3, MDT: 5, HIGH: 7 };
         const SPC_COLORS = { HIGH: '#e040fb', MDT: '#ff1744', ENH: '#ff9100', SLGT: '#ffeb3b', MRGL: '#7BB07B', TSTM: '#4fc3f7' };
@@ -2086,182 +2167,221 @@
             factorList.push({ label: 'SPC ' + spc, color: SPC_COLORS[spc] || '#7BB07B' });
         }
 
-        // ── 2. Storm proximity ─────────────────────────────────────────────
+        // ── 2. Storm Proximity + Approach Vector ──────────────────────────
+        // Approaching storms get an urgency bonus; receding get none.
         const dist = window.currentStormDist;
+        const approaching = window.stormApproaching || false;
         if (dist !== undefined && dist !== null) {
-            if (dist < 5)       { score += 3; factorList.push({ label: 'Storm ' + Math.round(dist) + ' mi', color: '#ff1744' }); }
-            else if (dist < 12) { score += 2; factorList.push({ label: 'Storm ' + Math.round(dist) + ' mi', color: '#ff9100' }); }
-            else if (dist < 25) { score += 1; factorList.push({ label: 'Storm ' + Math.round(dist) + ' mi', color: '#ffeb3b' }); }
+            let proxScore = 0, proxColor = '#ffeb3b';
+            if (dist < 5)       { proxScore = 3; proxColor = '#ff1744'; }
+            else if (dist < 12) { proxScore = 2; proxColor = '#ff9100'; }
+            else if (dist < 25) { proxScore = 1; proxColor = '#ffeb3b'; }
+            if (proxScore > 0) {
+                if (approaching) proxScore += 1; // storm getting closer = higher urgency
+                score += proxScore;
+                factorList.push({ label: 'Storm ' + Math.round(dist) + 'mi' + (approaching ? ' \u2197' : ''), color: proxColor });
+            }
         }
 
-        // ── 3. Per-alert-type scoring table ───────────────────────────────
-        // Scores reflect real-world NWS alert urgency hierarchy.
-        // Each entry: [substring-to-match, score, display-label, hex-color]
-        // Entries are matched in ORDER — first match wins for that alert event.
-        var ALERT_SCORE_TABLE = [
-            // ── Tornado (convective/life-safety, highest priority) ─────────
-            // Handled below via window flags for PDS/Emergency sub-types.
-            // Base tornado warning handled here; boosted below.
-            ['tornado warning',            10, 'Tornado Warning',           '#ff1744'],
-            ['tornado watch',               5, 'Tornado Watch',             '#ff9100'],
-            // ── Severe thunderstorm ────────────────────────────────────────
-            // Destructive boosted below via window.activeSVRDestructive.
-            ['severe thunderstorm warning', 7, 'SVR Thunderstorm Warning',  '#ff9100'],
-            ['severe thunderstorm watch',   3, 'SVR Thunderstorm Watch',    '#ffb300'],
-            // ── Tropical ──────────────────────────────────────────────────
-            ['hurricane warning',           9, 'Hurricane Warning',         '#e040fb'],
-            ['hurricane watch',             6, 'Hurricane Watch',           '#e040fb'],
-            ['tropical storm warning',      6, 'Tropical Storm Warning',    '#ff9100'],
-            ['tropical storm watch',        4, 'Tropical Storm Watch',      '#ffb300'],
-            ['storm surge warning',         8, 'Storm Surge Warning',       '#e040fb'],
-            ['storm surge watch',           5, 'Storm Surge Watch',         '#ff9100'],
-            // ── Flash flood ───────────────────────────────────────────────
-            // Flash Flood Emergency (FFE) boosted below via window.activeFFE.
-            ['flash flood warning',         6, 'Flash Flood Warning',       '#00bcd4'],
-            ['flash flood watch',           3, 'Flash Flood Watch',         '#4fc3f7'],
-            ['flash flood statement',       1, 'Flash Flood Statement',     '#4fc3f7'],
-            // ── General flood ─────────────────────────────────────────────
-            ['flood warning',               4, 'Flood Warning',             '#4fc3f7'],
-            ['flood watch',                 2, 'Flood Watch',               '#4fc3f7'],
-            ['coastal flood warning',       4, 'Coastal Flood Warning',     '#4fc3f7'],
-            ['coastal flood watch',         2, 'Coastal Flood Watch',       '#4fc3f7'],
-            ['lakeshore flood warning',     3, 'Lakeshore Flood Warning',   '#4fc3f7'],
-            // ── Winter / ice ──────────────────────────────────────────────
-            ['blizzard warning',            6, 'Blizzard Warning',          '#64b5f6'],
-            ['ice storm warning',           6, 'Ice Storm Warning',         '#90caf9'],
-            ['winter storm warning',        5, 'Winter Storm Warning',      '#90caf9'],
-            ['heavy snow warning',          4, 'Heavy Snow Warning',        '#90caf9'],
-            ['snow squall warning',         5, 'Snow Squall Warning',       '#90caf9'],
-            ['blizzard watch',              4, 'Blizzard Watch',            '#64b5f6'],
-            ['winter storm watch',          3, 'Winter Storm Watch',        '#90caf9'],
-            ['winter weather advisory',     1, 'Winter Weather Advisory',   '#b0bec5'],
-            ['freezing rain advisory',      1, 'Freezing Rain Advisory',    '#b0bec5'],
-            ['frost advisory',              1, 'Frost Advisory',            '#b0bec5'],
-            ['freeze warning',              3, 'Freeze Warning',            '#b0bec5'],
-            ['hard freeze warning',         4, 'Hard Freeze Warning',       '#90caf9'],
-            ['freeze watch',                2, 'Freeze Watch',              '#b0bec5'],
-            // ── Wind ──────────────────────────────────────────────────────
-            ['extreme wind warning',        8, 'Extreme Wind Warning',      '#ff9100'],
-            ['high wind warning',           5, 'High Wind Warning',         '#ffb300'],
-            ['high wind watch',             3, 'High Wind Watch',           '#ffb300'],
-            ['wind advisory',               2, 'Wind Advisory',             '#ffeb3b'],
-            // ── Heat / cold ───────────────────────────────────────────────
-            ['excessive heat warning',      5, 'Excessive Heat Warning',    '#ff5722'],
-            ['heat advisory',               2, 'Heat Advisory',             '#ff8a65'],
-            ['extreme cold warning',        5, 'Extreme Cold Warning',      '#90caf9'],
-            ['wind chill warning',          4, 'Wind Chill Warning',        '#90caf9'],
-            ['wind chill watch',            2, 'Wind Chill Watch',          '#b0bec5'],
-            ['wind chill advisory',         1, 'Wind Chill Advisory',       '#b0bec5'],
-            // ── Fire ──────────────────────────────────────────────────────
-            ['red flag warning',            4, 'Red Flag Warning',          '#ff5722'],
-            ['fire weather watch',          2, 'Fire Weather Watch',        '#ff8a65'],
-            ['fire warning',                7, 'Fire Warning',              '#ff5722'],
-            // ── Marine / coastal ──────────────────────────────────────────
-            ['gale warning',                4, 'Gale Warning',              '#4fc3f7'],
-            ['storm warning',               5, 'Marine Storm Warning',      '#ff9100'],
-            // ── Dust / smoke / fog ────────────────────────────────────────
-            ['dust storm warning',          5, 'Dust Storm Warning',        '#a1887f'],
-            ['blowing dust advisory',       2, 'Blowing Dust Advisory',     '#a1887f'],
-            ['dense fog advisory',          2, 'Dense Fog Advisory',        '#b0bec5'],
-            ['dense smoke advisory',        2, 'Dense Smoke Advisory',      '#a1887f'],
-            ['air quality alert',           1, 'Air Quality Alert',         '#a1887f'],
-            // ── Special weather ───────────────────────────────────────────
-            ['special weather statement',   1, 'Special Wx Statement',      '#ffeb3b'],
-            ['severe weather statement',    2, 'Severe Wx Statement',       '#ff9100'],
-            // ── Generic fallback (catches anything not matched above) ──────
-            ['warning',                     3, null,  '#ff9100'],
-            ['watch',                       2, null,  '#ffb300'],
-            ['advisory',                    1, null,  '#ffeb3b'],
-            ['statement',                   1, null,  '#aaaaaa'],
+        // ── 3. Per-Alert-Type Base Scoring ────────────────────────────────
+        // Each entry: [match-substring, points, display-label, color, hazard-category]
+        // Entries matched in order — first match wins per alert event.
+        var ALERT_TABLE = [
+            // Convective warnings (tornado handled separately below)
+            ['severe thunderstorm warning', 6, 'SVR Warning',             '#ff9100', 'convective'],
+            // Tropical
+            ['hurricane warning',           9, 'Hurricane Warning',       '#e040fb', 'tropical'],
+            ['storm surge warning',         8, 'Storm Surge Warning',     '#e040fb', 'tropical'],
+            ['tropical storm warning',      6, 'Tropical Storm Warning',  '#ff9100', 'tropical'],
+            ['hurricane watch',             6, 'Hurricane Watch',         '#e040fb', 'tropical'],
+            ['storm surge watch',           5, 'Storm Surge Watch',       '#ff9100', 'tropical'],
+            ['tropical storm watch',        4, 'Tropical Storm Watch',    '#ffb300', 'tropical'],
+            // Flash flood (FFE handled below via flag)
+            ['flash flood warning',         6, 'Flash Flood Warning',     '#00bcd4', 'flood'],
+            ['flash flood watch',           3, 'Flash Flood Watch',       '#4fc3f7', 'flood'],
+            ['flash flood statement',       1, 'Flash Flood Statement',   '#4fc3f7', 'flood'],
+            // General flood
+            ['flood warning',               4, 'Flood Warning',           '#4fc3f7', 'flood'],
+            ['coastal flood warning',       4, 'Coastal Flood Warning',   '#4fc3f7', 'flood'],
+            ['lakeshore flood warning',     3, 'Lakeshore Flood Warning', '#4fc3f7', 'flood'],
+            ['flood watch',                 2, 'Flood Watch',             '#4fc3f7', 'flood'],
+            ['coastal flood watch',         2, 'Coastal Flood Watch',     '#4fc3f7', 'flood'],
+            // Winter / ice
+            ['blizzard warning',            6, 'Blizzard Warning',        '#64b5f6', 'winter'],
+            ['ice storm warning',           6, 'Ice Storm Warning',       '#90caf9', 'winter'],
+            ['winter storm warning',        5, 'Winter Storm Warning',    '#90caf9', 'winter'],
+            ['snow squall warning',         5, 'Snow Squall Warning',     '#90caf9', 'winter'],
+            ['heavy snow warning',          4, 'Heavy Snow Warning',      '#90caf9', 'winter'],
+            ['blizzard watch',              4, 'Blizzard Watch',          '#64b5f6', 'winter'],
+            ['winter storm watch',          3, 'Winter Storm Watch',      '#90caf9', 'winter'],
+            ['hard freeze warning',         4, 'Hard Freeze Warning',     '#90caf9', 'winter'],
+            ['freeze warning',              3, 'Freeze Warning',          '#b0bec5', 'winter'],
+            ['wind chill warning',          4, 'Wind Chill Warning',      '#90caf9', 'winter'],
+            ['extreme cold warning',        5, 'Extreme Cold Warning',    '#90caf9', 'winter'],
+            ['wind chill watch',            2, 'Wind Chill Watch',        '#b0bec5', 'winter'],
+            ['freeze watch',                2, 'Freeze Watch',            '#b0bec5', 'winter'],
+            ['winter weather advisory',     1, 'Winter Weather Advisory', '#b0bec5', 'winter'],
+            ['freezing rain advisory',      1, 'Freezing Rain Advisory',  '#b0bec5', 'winter'],
+            ['frost advisory',              1, 'Frost Advisory',          '#b0bec5', 'winter'],
+            ['wind chill advisory',         1, 'Wind Chill Advisory',     '#b0bec5', 'winter'],
+            // Wind
+            ['extreme wind warning',        8, 'Extreme Wind Warning',    '#ff9100', 'wind'],
+            ['high wind warning',           5, 'High Wind Warning',       '#ffb300', 'wind'],
+            ['high wind watch',             3, 'High Wind Watch',         '#ffb300', 'wind'],
+            ['wind advisory',               2, 'Wind Advisory',           '#ffeb3b', 'wind'],
+            ['gale warning',                4, 'Gale Warning',            '#4fc3f7', 'wind'],
+            ['dust storm warning',          5, 'Dust Storm Warning',      '#a1887f', 'wind'],
+            ['blowing dust advisory',       2, 'Blowing Dust Advisory',   '#a1887f', 'wind'],
+            // Heat
+            ['excessive heat warning',      5, 'Excessive Heat Warning',  '#ff5722', 'heat'],
+            ['heat advisory',               2, 'Heat Advisory',           '#ff8a65', 'heat'],
+            // Fire
+            ['fire warning',                6, 'Fire Warning',            '#ff5722', 'fire'],
+            ['red flag warning',            4, 'Red Flag Warning',        '#ff5722', 'fire'],
+            ['fire weather watch',          2, 'Fire Weather Watch',      '#ff8a65', 'fire'],
+            ['dense smoke advisory',        2, 'Dense Smoke Advisory',    '#a1887f', 'fire'],
+            // Other
+            ['dense fog advisory',          2, 'Dense Fog Advisory',      '#b0bec5', 'other'],
+            ['air quality alert',           1, 'Air Quality Alert',       '#a1887f', 'other'],
+            ['special weather statement',   1, 'Special Wx Statement',    '#ffeb3b', 'other'],
+            ['severe weather statement',    2, 'Severe Wx Statement',     '#ff9100', 'other'],
+            // Convective watches
+            ['tornado watch',               5, 'Tornado Watch',           '#ff9100', 'convective'],
+            ['severe thunderstorm watch',   3, 'SVR Thunderstorm Watch',  '#ffb300', 'convective'],
+            // Catch-alls (any unmatched alert with these words)
+            ['warning',                     3, null, '#ff9100', 'other'],
+            ['watch',                       2, null, '#ffb300', 'other'],
+            ['advisory',                    1, null, '#ffeb3b', 'other'],
+            ['statement',                   1, null, '#aaaaaa', 'other'],
         ];
 
-        var seenAlertScore = 0;
         (window.activeAlertEvents || []).forEach(function(evtName) {
             var evtLower = evtName.toLowerCase();
-            // Tornado Emergency and PDS overrides handled separately below.
-            // Skip tornado warning here too — handled with flag logic below.
-            if (evtLower.includes('tornado warning')) return;
-
-            for (var i = 0; i < ALERT_SCORE_TABLE.length; i++) {
-                var entry = ALERT_SCORE_TABLE[i];
-                if (evtLower.includes(entry[0])) {
-                    var pts = entry[1];
-                    var label = entry[2] || evtName;
-                    var color = entry[3];
-                    // Only count an alert category once (take highest), but show each unique label
-                    if (pts > seenAlertScore || pts <= 2) {
-                        score += pts;
-                        seenAlertScore = Math.max(seenAlertScore, pts);
-                    }
-                    factorList.push({ label: label, color: color });
+            if (evtLower.includes('tornado warning')) return; // handled below with full sub-type logic
+            for (var i = 0; i < ALERT_TABLE.length; i++) {
+                var row = ALERT_TABLE[i];
+                if (evtLower.includes(row[0])) {
+                    score += row[1];
+                    hazardCats[row[4]] = (hazardCats[row[4]] || 0) + 1;
+                    factorList.push({ label: row[2] || evtName, color: row[3] });
                     break;
                 }
             }
         });
 
-        // ── 4. Tornado warning — sub-type aware ───────────────────────────
+        // ── 4. Tornado Warning — full sub-type aware scoring ──────────────
         if (window.activeTornadoWarning) {
+            hazardCats['convective'] = (hazardCats['convective'] || 0) + 1;
             if (window.activeTornadoEmergency) {
-                score += 20; factorList.push({ label: 'Tornado Emergency', color: '#e040fb' });
+                score += 20; factorList.push({ label: '\uD83D\uDEA8 Tornado Emergency', color: '#e040fb' });
             } else if (window.activePDSTornado) {
                 score += 15; factorList.push({ label: 'PDS Tornado Warning', color: '#e040fb' });
             } else if (window.activeTornadoObserved) {
-                score += 13; factorList.push({ label: 'Confirmed Tornado', color: '#ff1744' });
+                score += 11; factorList.push({ label: 'Confirmed Tornado', color: '#ff1744' });
             } else {
-                score += 10; factorList.push({ label: 'Tornado Warning', color: '#ff1744' });
+                score += 8; factorList.push({ label: 'Tornado Warning', color: '#ff1744' });
+            }
+            // Nighttime modifier: tornadoes at night are significantly more deadly
+            // (people are asleep, no visual cues, delayed warnings)
+            if (isNightAtStation && !window.activeTornadoEmergency && !window.activePDSTornado) {
+                score += 1; factorList.push({ label: 'Nighttime \uD83C\uDF19', color: '#9c27b0' });
             }
         }
 
-        // ── 5. SVR — destructive boost ────────────────────────────────────
-        if (window.activeSVRWarning && window.activeSVRDestructive) {
-            // Replace any SVR entry in factorList with upgraded label
-            for (var fi = 0; fi < factorList.length; fi++) {
-                if (factorList[fi].label === 'SVR Thunderstorm Warning') {
-                    factorList[fi].label = 'Destructive SVR Warning';
-                    factorList[fi].color = '#ff5722';
-                    break;
+        // ── 5. SVR Sub-Parameter Intelligence ────────────────────────────
+        if (window.activeSVRWarning) {
+            if (window.activeSVRDestructive) {
+                score += 1;
+                for (var fi = 0; fi < factorList.length; fi++) {
+                    if (factorList[fi].label === 'SVR Warning') { factorList[fi].label = 'Destructive SVR'; factorList[fi].color = '#ff5722'; break; }
+                }
+            } else if (window.alertHasConsiderableWind || window.alertHasConsiderableHail) {
+                score += 1;
+                for (var fi = 0; fi < factorList.length; fi++) {
+                    if (factorList[fi].label === 'SVR Warning') { factorList[fi].label = 'Considerable SVR'; factorList[fi].color = '#ff7043'; break; }
                 }
             }
-            score += 1; // extra point for destructive designation
+            if (window.alertHasTornadoPossible && !window.activeTornadoWarning) {
+                score += 1; factorList.push({ label: 'Tornado Possible', color: '#ff9100' });
+            }
         }
 
-        // ── 6. Flash Flood Emergency mandatory floor ───────────────────────
-        if (window.activeFFE) score = Math.max(score, 16);
+        // ── 6. NWS Alert Parameter Boosters ──────────────────────────────
+        // Large hail (NWS-reported max hail size from warning)
+        if (window.alertMaxHailIn >= 3.0)      { score += 2; factorList.push({ label: 'Hail ' + window.alertMaxHailIn.toFixed(1) + '"', color: '#ff5722' }); }
+        else if (window.alertMaxHailIn >= 1.75) { score += 1; factorList.push({ label: 'Hail ' + window.alertMaxHailIn.toFixed(1) + '"', color: '#ff9100' }); }
 
-        // ── 7. Observed wind speed ────────────────────────────────────────
-        if (liveWindSpd > 58)      { score += 3; factorList.push({ label: 'Wind ' + liveWindSpd + 'mph', color: '#ff1744' }); }
-        else if (liveWindSpd > 40) { score += 2; factorList.push({ label: 'Wind ' + liveWindSpd + 'mph', color: '#ff9100' }); }
-        else if (liveWindSpd > 30) { score += 1; factorList.push({ label: 'Wind ' + liveWindSpd + 'mph', color: '#ffeb3b' }); }
+        // High wind gust (NWS-reported from warning parameters)
+        if (window.alertMaxWindGustMph >= 80)   { score += 2; factorList.push({ label: 'Gust ' + window.alertMaxWindGustMph + ' mph', color: '#ff5722' }); }
+        else if (window.alertMaxWindGustMph >= 65) { score += 1; factorList.push({ label: 'Gust ' + window.alertMaxWindGustMph + ' mph', color: '#ff9100' }); }
 
-        // ── 8. Rapid pressure fall ────────────────────────────────────────
+        // Flash flood catastrophic designation (below FFE level but still extreme)
+        if (window.alertHasCatastrophicFlood && !window.activeFFE) {
+            score += 3; factorList.push({ label: 'Catastrophic flooding', color: '#00e5ff' });
+        }
+
+        // ── 7. Observed Certainty Boost ───────────────────────────────────
+        // NWS marks alerts as "Observed" when the hazard is directly confirmed
+        if (window.alertHasObservedCertainty) {
+            score += 1; // already-confirmed events are inherently more urgent
+        }
+
+        // ── 8. Multi-Hazard Stacking ──────────────────────────────────────
+        // Simultaneous distinct hazard types compound danger non-linearly
+        const distinctCats = Object.keys(hazardCats).length;
+        if (distinctCats >= 3) { score += 2; factorList.push({ label: 'Multi-hazard event', color: '#e040fb' }); }
+        else if (distinctCats >= 2) { score += 1; factorList.push({ label: 'Multiple hazards', color: '#ff9100' }); }
+
+        // ── 9. Observed Atmospheric Conditions ────────────────────────────
+        // Wind speed (station-observed)
+        if (liveWindSpd >= 58)     { score += 3; factorList.push({ label: 'Wind ' + liveWindSpd + ' mph', color: '#ff1744' }); }
+        else if (liveWindSpd >= 40) { score += 2; factorList.push({ label: 'Wind ' + liveWindSpd + ' mph', color: '#ff9100' }); }
+        else if (liveWindSpd >= 30) { score += 1; factorList.push({ label: 'Wind ' + liveWindSpd + ' mph', color: '#ffeb3b' }); }
+
+        // Precipitation intensity — elevates flood threat when rain is heavy
+        const hasFloodAlert = (window.activeAlertEvents || []).some(function(e) { return e.toLowerCase().includes('flood'); });
+        if (livePrecipInt >= 0.3 && hasFloodAlert)      { score += 2; factorList.push({ label: 'Heavy rainfall', color: '#00bcd4' }); }
+        else if (livePrecipInt >= 0.15 && hasFloodAlert) { score += 1; factorList.push({ label: 'Moderate rainfall', color: '#4fc3f7' }); }
+
+        // Atmospheric extremes (feels-like temperature)
+        const feels = liveFeelsLike;
+        if (feels >= 115)      { score += 3; factorList.push({ label: 'Feels ' + Math.round(feels) + '\u00b0F', color: '#ff1744' }); }
+        else if (feels >= 105) { score += 2; factorList.push({ label: 'Feels ' + Math.round(feels) + '\u00b0F', color: '#ff5722' }); }
+        else if (feels >= 95 && hazardCats.heat) { score += 1; factorList.push({ label: 'Feels ' + Math.round(feels) + '\u00b0F', color: '#ff8a65' }); }
+        if (feels <= -35)      { score += 3; factorList.push({ label: 'Feels ' + Math.round(feels) + '\u00b0F', color: '#90caf9' }); }
+        else if (feels <= -20) { score += 2; factorList.push({ label: 'Feels ' + Math.round(feels) + '\u00b0F', color: '#b0bec5' }); }
+
+        // Rapid pressure fall (meteorological instability signal)
         const presEl = document.getElementById('presVal');
         if (presEl && presEl.innerHTML.includes('\u2198\uFE0F')) { score += 1; factorList.push({ label: 'Pressure falling', color: '#ffeb3b' }); }
 
-        // ── 9. Mandatory life-threatening floors ──────────────────────────
-        if (window.activeTornadoEmergency || window.activePDSTornado) score = Math.max(score, 18);
+        // ── 10. Mandatory Life-Threatening Floors ─────────────────────────
+        if (window.activeTornadoEmergency) score = Math.max(score, 20);
+        if (window.activePDSTornado)       score = Math.max(score, 18);
+        if (window.activeFFE)              score = Math.max(score, 16);
 
-        // ── 10. Determine tier ────────────────────────────────────────────
-        let tier, tierClass, emoji, descText;
-        if (score >= 16) {
-            tier = 'LIFE THREATENING'; tierClass = 'threat-tier-life'; emoji = '\uD83D\uDFE3';
-            descText = 'A life-threatening weather emergency is in progress. Take immediate protective action now.';
-        } else if (score >= 10) {
-            tier = 'DANGEROUS'; tierClass = 'threat-tier-danger'; emoji = '\uD83D\uDD34';
-            descText = 'Hazardous weather conditions are active near you. Remain sheltered and follow NWS guidance.';
-        } else if (score >= 6) {
-            tier = 'ACTIVE WEATHER'; tierClass = 'threat-tier-active'; emoji = '\uD83D\uDFE0';
-            descText = 'Active weather alerts are in effect. Stay aware and be ready to act quickly.';
-        } else if (score >= 3) {
-            tier = 'ELEVATED'; tierClass = 'threat-tier-elev'; emoji = '\uD83D\uDFE1';
-            descText = 'Weather concerns are present. Monitor forecasts and be prepared for changing conditions.';
-        } else {
-            tier = 'LOW'; tierClass = 'threat-tier-low'; emoji = '\uD83D\uDFE2';
-            descText = 'No significant weather hazards detected. Conditions appear calm at this time.';
-        }
+        // ── 11. Tier Classification ───────────────────────────────────────
+        let tier, tierClass, emoji;
+        if (score >= 16)      { tier = 'LIFE THREATENING'; tierClass = 'threat-tier-life';   emoji = '\uD83D\uDFE3'; }
+        else if (score >= 8)  { tier = 'DANGEROUS';        tierClass = 'threat-tier-danger'; emoji = '\uD83D\uDD34'; }
+        else if (score >= 5)  { tier = 'ACTIVE WEATHER';   tierClass = 'threat-tier-active'; emoji = '\uD83D\uDFE0'; }
+        else if (score >= 3)  { tier = 'ELEVATED';         tierClass = 'threat-tier-elev';   emoji = '\uD83D\uDFE1'; }
+        else                  { tier = 'LOW';              tierClass = 'threat-tier-low';    emoji = '\uD83D\uDFE2'; }
+
+        // ── 12. Smart Contextual Description ─────────────────────────────
+        const descFlags = {
+            torEmergency: window.activeTornadoEmergency,
+            pdsTor:       window.activePDSTornado,
+            ffe:          window.activeFFE,
+            torObserved:  window.activeTornadoObserved && !window.activePDSTornado && !window.activeTornadoEmergency,
+            torWarning:   window.activeTornadoWarning && !window.activeTornadoObserved && !window.activePDSTornado && !window.activeTornadoEmergency,
+            night:        isNightAtStation,
+            heavyRain:    livePrecipInt >= 0.15,
+        };
 
         box.className = 'toolkit-box threat-box ' + tierClass;
         badge.textContent = emoji + ' ' + tier;
-        desc.textContent = descText;
+        descEl.textContent = buildThreatDescription(tier, hazardCats, descFlags);
         factors.innerHTML = factorList.map(function(f) {
             return '<span style="background:' + f.color + '22;color:' + f.color + ';border:1px solid ' + f.color + '44;padding:3px 8px;border-radius:6px;font-size:0.7em;font-weight:bold;">' + f.label + '</span>';
         }).join('');
